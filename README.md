@@ -8,7 +8,9 @@
 
 已完成：QEMU 中启动一个 RISC-V 裸机内核，打印启动标记并关机；CI 能自动检查这一过程。
 
-接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
+2026-11-05 真板进展：已从 VisionFive2 的 U-Boot 加载 FocOS，通过 SBI 打印启动标记；[实测证据](docs/evidence/BOARD-001-20261105.txt)已记录。该改动待人工审阅和队友独立复现。
+
+接下来：自写 UART 收发、定时中断、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
 ## 第一天：跑起来 → 选任务 → 提第一个 PR
 
@@ -28,24 +30,28 @@ Focos/
 ├── AGENTS.md                          # 开发、文档与审阅约定
 ├── kernel/                            # Rust 裸机内核
 │   ├── Cargo.toml                     # 内核 crate 的构建定义
+│   ├── build.rs                       # 链接脚本变化时触发重新链接
 │   └── src/                           # 内核源代码
 │       ├── main.rs                    # Rust 入口和 panic 处理
-│       ├── hal.rs                     # 供内核调用的早期输出和关机接口
+│       ├── hal.rs                     # 早期输出、关机与板级停机等待接口
 │       └── arch/                      # 与 CPU 架构相关的实现
 │           ├── mod.rs                 # 选择目标架构并导出接口
 │           └── riscv64/               # RISC-V 启动与 SBI 实现
-│               ├── entry.S            # 设置栈、清理 BSS 并进入 Rust
-│               ├── linker.ld          # 内核加载地址和段布局
+│               ├── entry.S            # 区分 QEMU/bootelf 入口，建栈并清理 BSS
+│               ├── linker.ld          # 内核地址及兼容旧 U-Boot 的装载段布局
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
-│   └── BOOT-001.md                    # QEMU 启动规格
+│   ├── BOOT-001.md                    # QEMU 启动规格
+│   └── BOARD-001.md                   # VisionFive2 bootelf 启动规格与实测范围
 ├── scripts/                           # 构建与验证辅助脚本
-│   └── smoke.py                       # 检查 QEMU 启动标记和退出状态
+│   ├── smoke.py                       # 检查 QEMU 启动标记和退出状态
+│   └── smoke_bootelf.py               # ELF 兼容检查与 QEMU 模拟 bootelf 调用
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 测例、优先级与验收状态
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南
 │   ├── getting-started.md             # 配环境、运行和首次提交
+│   ├── visionfive2.md                 # 串口、复制 ELF 和 U-Boot 手动加载
 │   ├── architecture.md                # 内核分层与跨平台扩展图
 │   ├── backlog.md                     # 可认领任务与依赖入口
 │   ├── collaboration.md               # 认领、测试、审阅与合入流程
@@ -54,6 +60,8 @@ Focos/
 │   ├── benchmarks.md                  # 怎样测性能并生成图表
 │   ├── references.md                  # 赛规、测例和技术资料来源
 │   ├── ai-usage.md                    # AI 辅助和人工复核记录
+│   ├── evidence/                      # 可分享的实测证据
+│   │   └── BOARD-001-20261105.txt      # 首次真板启动记录（已去除设备标识）
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 接口、交付边界和阶段目标
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
@@ -78,6 +86,7 @@ Focos/
 | 你现在要做什么 | 阅读入口 |
 | --- | --- |
 | 配环境、第一次提交 | [上手指南](docs/getting-started.md) |
+| 用 VisionFive2 做第一次上板试验 | [上板指南](docs/visionfive2.md) |
 | 看一次文件读取经过哪些层、如何扩到双板 | [架构图](docs/architecture.md) |
 | 选任务、看依赖 | [任务入口](docs/backlog.md) |
 | 写 spec、提交和审阅 PR | [协作流程](docs/collaboration.md) |

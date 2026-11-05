@@ -1,11 +1,11 @@
 # 从用户程序到磁盘
 
-这张图画的是 FocOS 的目标架构。底部的 QEMU 节点标出了当前已经验证的启动能力。区域赛先在 VisionFive2 上接通整条路径，全国赛再移植到星云板并验证同一套文件系统。
+这张图画的是 FocOS 的目标架构。当前已验证 QEMU 启动、SBI 输出与关机，以及 VisionFive2 上 U-Boot 加载 FocOS 后的 SBI 输出（[实测记录](evidence/BOARD-001-20261105.txt)）；真板 UART/SD 驱动和其余内核功能待实现。区域赛先在 VisionFive2 上接通整条路径，全国赛再移植到星云板并验证同一套文件系统。
 
 ```mermaid
 flowchart TB
     accTitle: FocOS 目标架构
-    accDescr: 用户程序经系统调用访问 FAT32。HAL 和 arch 隔离两块板的差异。当前已验证 QEMU 启动、SBI 输出和关机。
+    accDescr: 用户程序经系统调用访问 FAT32。HAL 和 arch 隔离两块板的差异。已验证 QEMU 启动及关机、VisionFive2 bootelf 启动与 SBI 输出；真板驱动待实现。
 
     subgraph USER["用户态"]
         DEMO["区域赛<br/>演示程序与历史测例"]
@@ -23,7 +23,7 @@ flowchart TB
     end
 
     HAL["HAL / arch<br/>设备接口 · 启动 · CPU 操作"]
-    VF2["VisionFive2 · JH7110<br/>区域赛真板 · SD / UART"]
+    VF2["VisionFive2 · JH7110<br/>已实测 bootelf / SBI 输出<br/>SD / UART 驱动待实现"]
     LA["2K1000LA 星云板<br/>全国赛扩展 · LoongArch64"]
     QEMU["QEMU virt · 已验证<br/>启动、SBI 输出与关机"]
 

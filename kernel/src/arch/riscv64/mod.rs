@@ -1,6 +1,17 @@
 use core::arch::{asm, global_asm};
 
-global_asm!(include_str!("entry.S"));
+global_asm!(
+    include_str!("entry.S"),
+    bootelf = const cfg!(feature = "vf2-bootelf") as usize,
+);
+
+#[cfg(feature = "vf2-bootelf")]
+pub fn halt() -> ! {
+    loop {
+        // SAFETY: BOARD-001 已关闭 S 模式中断，当前 hart 不再执行内核工作。
+        unsafe { asm!("wfi", options(nomem, nostack)) }
+    }
+}
 
 pub fn console_putchar(byte: u8) {
     // SAFETY: 在 S 模式向 OpenSBI 调用传统控制台接口，无指针参数。
