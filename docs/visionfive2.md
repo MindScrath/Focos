@@ -33,6 +33,16 @@ mmc part
 
 ## 2. 在开发机生成 ELF
 
+队友首次复现可直接取已记录的源版本，无须等待合入 main：
+
+```sh
+git clone https://github.com/ApolloMonasa/Focos-contrib.git Focos-vf2
+cd Focos-vf2
+git switch --detach 3e536a444387c1d383dea7a21c505189cb1e94b3
+```
+
+这是首次上板实现的完整提交；本指南后续的文档提交不改变该次实现。该版本尚待人工审阅。工具准备见 [上手指南](getting-started.md)。
+
 在 FocOS 仓库根目录执行：
 
 ```sh

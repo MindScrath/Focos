@@ -4,6 +4,9 @@ BOARD-001 首次真板启动证据（2026-11-05，Asia/Shanghai）
 范围：VisionFive2 8 GiB，OpenSBI VF2_515_v3.6.1，U-Boot 2021.10。
 基线提交：d704766161365c3496b9c46bac0b3bc5dcdceb11
 构建状态：基线之上的未提交改动；不能将基线 SHA 当作完整实验源码版本。
+代码归档提交：3e536a444387c1d383dea7a21c505189cb1e94b3
+该提交在首次实测后建立；构建所用 kernel、Cargo 配置、Makefile 和模拟检查
+与下述冻结源码快照逐文件比对一致，ELF 哈希保持一致。
 本地源码快照：vf2-source-20261105.tar.gz
 源码快照 SHA256：af0d4ad6c8b9ec21b3ae4ec48cfd0611d6dff8d2aff871392214fb1cf0ce603f
 ELF：focos-vf2.elf，22720 bytes
