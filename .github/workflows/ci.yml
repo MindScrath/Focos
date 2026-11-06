@@ -21,12 +21,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Install QEMU
-        run: sudo apt-get update && sudo apt-get install -y qemu-system-misc
+      - name: Install QEMU and RISC-V binutils
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-misc binutils-riscv64-linux-gnu
       - name: Install pinned Rust
         run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --target riscv64gc-unknown-none-elf --no-self-update
       - name: Verify build and boot
-        run: make check
+        run: make check && make vf2-check
       - name: Keep boot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

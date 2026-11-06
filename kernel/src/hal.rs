@@ -9,3 +9,8 @@ pub fn console_write(message: &str) {
 pub fn shutdown(failed: bool) -> ! {
     crate::arch::shutdown(failed)
 }
+
+#[cfg(feature = "vf2-bootelf")]
+pub fn halt() -> ! {
+    crate::arch::halt()
+}
