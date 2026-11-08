@@ -1,6 +1,7 @@
-.PHONY: all build fmt lint smoke check clean
+.PHONY: all build fmt lint test smoke check clean
 
 TARGET := riscv64gc-unknown-none-elf
+HOST_TARGET := $(shell rustc -vV | sed -n 's/^host: //p')
 
 all: build
 
@@ -12,11 +13,15 @@ fmt:
 
 lint:
 	cargo clippy --locked --release --target $(TARGET) -- -D warnings
+	cargo clippy --locked -p focos-kernel --lib --target $(HOST_TARGET) -- -D warnings
+
+test:
+	cargo test --locked -p focos-kernel --lib --target $(HOST_TARGET)
 
 smoke: build
 	python3 scripts/smoke.py
 
-check: fmt lint smoke
+check: fmt lint test smoke
 
 clean:
 	cargo clean

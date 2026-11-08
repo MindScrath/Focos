@@ -1,14 +1,14 @@
 # 第一天：运行 → 认领 → 提交
 
-目标：看到 `PASS: BOOT-001`，然后交一个队友能快速审完的小改动。
+先通过开发机测试和 QEMU 启动检查，再交一个队友能快速审完的小改动。
 
 ## 1. 准备环境
 
-需要 Linux、Git、rustup、make、Python 3、QEMU RISC-V。Ubuntu / Debian：
+需要 Linux、Git、rustup、make、sed、Python 3 和 QEMU RISC-V。开发机测试还需要本机 C 链接工具（`cc`）。Ubuntu / Debian 安装示例：
 
 ```sh
 sudo apt update
-sudo apt install -y git make python3 qemu-system-misc binutils-riscv64-linux-gnu
+sudo apt install -y git build-essential sed python3 qemu-system-misc binutils-riscv64-linux-gnu
 ```
 
 按 [rustup 官方说明](https://www.rust-lang.org/tools/install) 安装 Rust 管理器。仓库的 `rust-toolchain.toml` 固定工具链；首次运行会下载。Fedora 使用对应系统包；WSL2 可用于 QEMU 开发，板卡连接需另配。
@@ -28,14 +28,22 @@ make check
 
 `origin` 是个人 fork，`upstream` 是团队仓库。分支名中的 `1` 换成认领的 Issue 编号。
 
-成功标志：`PASS: BOOT-001`。日志：`target/evidence/boot-qemu-rv.log`。只编译用 `make build`，只跑启动流程用 `make smoke`。
+`make check` 检查格式和 clippy，运行开发机单元测试，再构建内核并检查 QEMU 启动。全部通过时，终端会显示 `test result: ok` 和 `PASS: BOOT-001`，命令正常退出。
+
+单独验证 [HAL-001 内存盘](../specs/HAL-001.md) 用 `make test`，结果和失败断言显示在终端。只编译用 `make build`，只跑启动流程用 `make smoke`，启动日志在 `target/evidence/boot-qemu-rv.log`。
 
 | 遇到问题 | 先检查 |
 | --- | --- |
 | 找不到 QEMU | `qemu-system-riscv64 --version` |
 | Rust 下载失败 | 网络与 rustup 安装 |
 | 格式不对 | `cargo fmt --all` 后查看 diff |
+| clippy 报错 | 按 `make lint` 输出的文件和行号修复，再复跑 |
+| 开发机测试找不到链接器 | 运行 `cc --version`，缺失时安装本机编译工具链。Ubuntu / Debian 用上面的 `build-essential` |
+| 开发机目标为空或不匹配 | 检查 `rustc -vV` 是否列出 `host:`，确认 sed 可用且 `HOST_TARGET` 未被覆盖 |
+| 开发机测试出现 `FAILED` | 用 `make test` 复跑，按失败用例名和断言定位。内存盘用例见 [`kernel/src/block/tests.rs`](../kernel/src/block/tests.rs) |
 | 启动超时 | 日志、完整命令与当前 SHA；不要删断言 |
+
+修复后重跑 `make check`。如果检查在启动前失败，请用本次终端输出定位，已有启动日志可能来自上一次运行。
 
 ## 3. 交第一份 PR
 

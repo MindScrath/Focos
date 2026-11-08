@@ -11,9 +11,14 @@ FocOS（读作 Focus）是 Rust `no_std` 操作系统。我们要在 VisionFive2
 
 准确范围见 [REGION-001](specs/REGION-001.md)。LoongArch 双平台、完整 LTP、2026 复杂负载和真实磁盘 HNSW 查询留到全国赛。新目标工期风险较高，检查点见 [路线](docs/roadmap.md)。
 
+
 ## 当前到哪里了
 
 main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 VisionFive2 启动证据见 [PR #16](https://github.com/MindScrath/Focos/pull/16)，它不代表自有 UART/SD 已完成。
+
+本分支新增：统一块设备接口与内存盘，开发机测试覆盖单块读写、边界和同步错误。运行 `make test` 单独验证；`make check` 同时执行这些测试和原有启动检查。内存盘不提供断电持久化，真实 SD 驱动另行实现。行为约定见 [HAL-001](specs/HAL-001.md)。
+
+接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
 **历史测试、开发工具和文件系统性能均无通过成绩。** 本页目标不是已有功能。
 
@@ -39,9 +44,14 @@ Focos/
 ├── README.md                          # 项目首页和成员入口
 ├── AGENTS.md                          # 开发、文档与审阅约定
 ├── kernel/                            # Rust 裸机内核
-│   ├── Cargo.toml                     # 内核 crate 的构建定义
+│   ├── Cargo.toml                     # 内核可执行文件与通用库的构建定义
 │   └── src/                           # 内核源代码
 │       ├── main.rs                    # Rust 入口和 panic 处理
+│       ├── lib.rs                     # no_std 通用组件与开发机测试入口
+│       ├── block.rs                   # 块设备 trait、错误类型与块大小
+│       ├── block/                     # 块设备实现与行为测试
+│       │   ├── memory.rs              # 借用缓冲区的内存盘
+│       │   └── tests.rs               # 正常、边界与故障注入测试
 │       ├── hal.rs                     # 供内核调用的早期输出和关机接口
 │       └── arch/                      # 与 CPU 架构相关的实现
 │           ├── mod.rs                 # 选择目标架构并导出接口
@@ -51,6 +61,7 @@ Focos/
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
 │   ├── BOOT-001.md                    # QEMU 启动规格与填写示例
+│   ├── HAL-001.md                     # 块设备接口与内存盘规格
 │   ├── MM-001.md                      # 物理页分配与回收规格
 │   ├── REGION-001.md                  # 区域赛唯一交付范围
 │   └── TEMPLATE.md                    # 短 SPEC 模板
