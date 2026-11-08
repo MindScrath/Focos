@@ -37,6 +37,7 @@
 | judge 崩溃 | 用退出码 3 的假 judge | 组 JUDGE_ERROR，子用例全 JUDGE_ERROR，退出码 1 |
 | 缺失项补 0 | 官方 judge 空输入 | 输出清单全部子用例，`pass=0`，不崩溃 |
 | 性能组 | iozone 给一个正吞吐 | 该项 PASS；单位不同的分数不跨组比较 |
+| 参考 Linux 真实输出 | [reference-run.md](../docs/reference/reference-run.md) 的 11 组日志 | 官方/团队 judge 均不崩溃；缺项补 0；结果与文档表一致 |
 | 11 组烟测 | 合成日志跑全部组 | 427 个子用例、0 个 JUDGE_ERROR、11 组都有结果 |
 
 测试先失败再实现；证据放 PR，不在本文件维护运行状态。

@@ -51,6 +51,7 @@
 4. **libctest 名单**：镜像 `run-static.sh` 107 项、`run-dynamic.sh` 110 项；judge baseline 是 109 + 111。缺失项为 static 的 `crypt`、`pleval` 和 dynamic 的 `crypt`。在 `entry-static.exe` 中搜索不到这三个字符串，说明镜像二进制本身不支持，不能靠补脚本解决。因此 libctest 最高只能拿 **217/220**。
 5. **LTP**：镜像包含 LTP，本计划明确排除；任何结果表都不得把 LTP 计入分母。
 6. 镜像中包含 musl/glibc 两套完整二进制（busybox、lua、iozone、iperf3、netperf、netserver、cyclictest、hackbench、lmbench_all、libc-bench、entry-static/dynamic.exe、runtest.exe），每组约 118 个文件。
+7. **basic 的 musl 不是独立构建**：`/musl/basic/{brk,chdir,getpid}` 与 `/glibc/basic/...` 的 SHA256 完全相同；`/musl/lib` 只有 `libc.so`，没有 `ld-linux-riscv64-lp64d.so.1`。参考运行中 musl basic 0/32，不能把 musl basic 当成独立的一套。详见 [reference-run.md](reference-run.md)。
 
 ## 4. 判分协议与已知坑
 
@@ -99,10 +100,12 @@ TEST001_JUDGE_DIR=third_party/oskernel-testsuits-cooperation/judge \
   python -m unittest discover -s scripts/tests -v
 ```
 
-## 7. 尚未完成
+## 7. 参考运行与尚未完成
 
-- [ ] 参考 Linux/QEMU 跑同一镜像，确认 judge 在真实输出上的行为（P4.2；本机无 QEMU/Docker，需队友或 GitHub Actions）。
+- [x] 参考 Linux/QEMU 跑同一镜像，确认 judge 在真实输出上的行为（2026-11-08 完成，11 组均有真实结果；见 [reference-run.md](reference-run.md)）。
 - [ ] 真实 FOCOS QEMU 串口采集（P5；依赖 #2/#4/#5/#7/#22/#23/#24）。
 - [ ] VF2 单独结果（P6.3；依赖板卡）。
 - [ ] 与赛方/往届队伍确认平台 judge 是否就是本仓库的 6 个脚本（公开仓库可能不是最终版本）。
 - [ ] 决定是否制作“适配镜像”修补 busybox/libctest 的 4 个不可达项；若做，单独列结果。
+
+参考运行发现：basic 的 musl 实际是 glibc 构建；busybox judge 多 `kill 10`；libctest 镜像缺 `crypt`/`pleval`；lmbench 的 `lat_proc fork` 在最小参考环境挂住；unixbench 的 `SHELL1/8/16` 无判分行。这些都不改变“FOCOS 结果另行采集”的边界。

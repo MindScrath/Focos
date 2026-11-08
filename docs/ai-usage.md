@@ -15,7 +15,7 @@
 | 11/6 HAL-001 | Codex 实现用户起草的块设备规格，包括 `BlockDevice`、`MemoryDisk`、开发机测试和文档 | 先运行 9 项测试确认内存盘尚未实现，再补齐实现和字节顺序用例。10 项开发机测试与 QEMU 启动回归均通过。同步错误来自测试设备的故障注入。接口和同步语义仍需人工审阅。[PR #26](https://github.com/MindScrath/Focos/pull/26) · [CI 记录](https://github.com/MindScrath/Focos/actions/runs/42389431603) |
 | 11/8 页分配规格 | Codex 辅助起草 [MM-001](../specs/MM-001.md)，作者已审阅 | 文档与链接检查通过，规格已通过 [PR #27](https://github.com/MindScrath/Focos/pull/27) 合入 |
 | 11/8 页分配与回收 | Codex 按 [MM-001](../specs/MM-001.md) 编写测试和实现，作者已审阅全部代码 | 测试先失败后通过；`make check` 通过，包含 17 项页分配测试、10 项块设备测试及 QEMU 启动回归。未接入真实内存，待两名队友审阅。日志保留在本地 `target/evidence/` |
-| 11/8 TEST-001 | 下载并校验 2025 初赛镜像；展开 11 组 427 项清单；审计官方 judge 覆盖与镜像差异；起草 [TEST-001](../specs/TEST-001.md)、[inventory](reference/test-inventory.md) 与 runner | 镜像压缩包 SHA256 与 release 元数据一致；11 组脚本逐行对比；5 个官方 judge 空输入均返回全部子用例且全 0；runner 9 项负向测试与 11 组烟测通过。未跑参考 Linux/QEMU、FOCOS 集成或真板；busybox 1 项、libctest 3 项不可达，验收口径待负责人确认 |
+| 11/8 TEST-001 | 下载并校验 2025 初赛镜像；展开 11 组 427 项清单；审计官方 judge 覆盖与镜像差异；起草 [TEST-001](../specs/TEST-001.md)、[inventory](reference/test-inventory.md) 与 runner | 镜像压缩包 SHA256 与 release 元数据一致；11 组脚本逐行对比；5 个官方 judge 空输入均返回全部子用例且全 0；runner 9 项负向测试与 11 组烟测通过；并用 Alpine Linux 6.18.60 + QEMU 9.2.4 跑通参考串口日志（11 组真实结果，见 [reference-run](reference/reference-run.md)）。FOCOS 集成或真板未跑；busybox 1 项、libctest 3 项不可达，验收口径待负责人确认 |
 | 11/9 页分配审阅调整 | 统一页分配接口与测试注释，测试共用页大小常量并补规格断言，作者已审阅全部代码 | `make check` 与测试代码 Clippy 通过，28 项测试通过；待队友复审 |
 | 11/9 真实内存接入规格 | Codex 按模板起草 [MM-002](../specs/MM-002.md)，核对现有启动代码、QEMU/OpenSBI 固定版本来源；作者已审阅 | 模板、事实与链接检查通过；仅规格草案，待另外两名队友审阅。未实现内存接入，未运行新增测试或 `make check` |
 
