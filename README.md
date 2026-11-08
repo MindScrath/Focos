@@ -51,6 +51,7 @@ Focos/
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
 │   ├── BOOT-001.md                    # QEMU 启动规格与填写示例
+│   ├── MM-001.md                      # 物理页分配与回收规格
 │   ├── REGION-001.md                  # 区域赛唯一交付范围
 │   └── TEMPLATE.md                    # 短 SPEC 模板
 ├── scripts/                           # 构建与验证辅助脚本
