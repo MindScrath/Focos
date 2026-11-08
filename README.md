@@ -20,6 +20,8 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，使用调用者提供的标记管理页地址。运行 `make test` 验证开发机行为；真实内存接入、页表与用户映射尚未实现，本阶段仍待队友审阅与验收。
 
+本分支另增：TEST-001 的输入冻结、427 项子用例清单和串口日志 runner；真实 QEMU/真板结果尚未产生。入口见 [test-inventory](docs/reference/test-inventory.md)、[TEST-001](specs/TEST-001.md)。
+
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
 **历史测试、开发工具和文件系统性能均无通过成绩。** 本页目标不是已有功能。
@@ -66,9 +68,14 @@ Focos/
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
 ├── scripts/                           # 构建与验证辅助脚本
-│   └── smoke.py                       # 检查 QEMU 启动标记和退出状态
+│   ├── smoke.py                       # 检查 QEMU 启动标记和退出状态
+│   ├── run_tests.py                   # TEST-001 串口切组、判分与结果汇总
+│   ├── fetch_judges.py                # 按固定 commit 拉取官方 judge
+│   ├── judge_team/                    # 5 组无官方 judge 的团队判据
+│   └── tests/                         # runner 的负向与契约测试
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
+│   ├── inventory.json                 # TEST-001 冻结的 427 项子用例清单
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南
@@ -84,7 +91,8 @@ Focos/
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
-│       └── test-audit.md              # 历史测评分支与测例审计
+│       ├── test-audit.md              # 历史测评分支与测例审计
+│       └── test-inventory.md          # TEST-001 输入冻结、逐组清单与差异
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
 ├── .github/                           # GitHub 模板、检查与保护配置
