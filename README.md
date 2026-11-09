@@ -20,7 +20,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，使用调用者提供的标记管理页地址。运行 `make test` 验证开发机行为；真实内存接入、页表与用户映射尚未实现，本阶段仍待队友审阅与验收。
 
-本分支另增：TEST-001 的输入冻结、427 项子用例清单和串口日志 runner；真实 QEMU/真板结果尚未产生。入口见 [test-inventory](docs/reference/test-inventory.md)、[TEST-001](specs/TEST-001.md)。
+本分支另增：TEST-001 的输入冻结、427 项子用例清单和参考 Linux 判分基线；FOCOS 的 QEMU/真板结果尚未产生。入口见 [test-inventory](docs/reference/test-inventory.md)、[reference-run](docs/reference/reference-run.md)、[TEST-001](specs/TEST-001.md)。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
