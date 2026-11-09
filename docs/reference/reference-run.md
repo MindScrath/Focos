@@ -6,7 +6,7 @@
 
 ## 一句话结论
 
-11 组都能在参考环境产出可判分的真实输出；6 个官方 judge 和 5 个团队 judge 均未崩溃，缺项按 0 计。发现 3 个镜像/判分侧的硬问题：basic 的 musl 二进制实际是 glibc 构建、busybox judge 多一个 `kill 10`、libctest 镜像少 3 项。参考环境的完整结果见第 4 节。
+11 组都能在参考环境产出可判分的真实输出；5 个可作 stdin 判分的官方 judge + 5 个团队 judge 均未崩溃，缺项按 0 计（lmbench 使用团队解析器；官方 `lmbench.sh` 是运行器，不是 stdin 判分器）。发现 3 个镜像/判分侧的硬问题：basic 的 musl 二进制实际是 glibc 构建、busybox judge 多一个 `kill 10`、libctest 镜像少 3 项。参考环境的完整结果见第 3 节。
 
 ## 1. 参考环境
 
@@ -74,7 +74,7 @@ initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virt
 5. **lmbench 的官方 judge 不是 stdin 判分器**：`judge/lmbench.sh` 会执行命令；团队解析器按真实标签校准后，前 11 项正确。`lat_proc fork` 在最小参考环境挂住，说明后续项需要完整进程/文件环境。
 6. **unixbench 的 SHELL 项**：`SHELL1/8/16` 没有输出 `Unixbench ... test(lpm):` 行；团队判据按缺项 0 分处理，24/27。需要真实 FOCOS 输出再确认是环境问题还是实现问题。
 7. **netperf 的 `AI_ADDRCONFIG`**：只有 loopback 时 `getaddrinfo("127.0.0.1")` 返回 `EAI_NONAME`；加 `dummy0` 后 5/5。这说明运行环境需要至少一个非 loopback IPv4 地址。
-8. **判分器稳定性**：11 组、6 官方 + 5 团队 judge，全部无 `JUDGE_ERROR`；缺组/缺输出/START 无 END 的负向行为已在 `scripts/tests/test_runner.py` 覆盖。
+8. **判分器稳定性**：11 组、5 个 stdin 官方 judge + 5 个团队 judge（lmbench 用团队解析器），全部无 `JUDGE_ERROR`；缺组/缺输出/START 无 END 的负向行为已在 `scripts/tests/test_runner.py` 覆盖。
 
 ## 5. 这些结果不能怎么用
 
