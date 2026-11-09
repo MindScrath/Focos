@@ -1,9 +1,7 @@
 //! MM-001 的开发机行为测试。地址只作数值使用，不解引用物理内存。
 
-use super::{PageAllocError, PageAllocator};
+use super::{PAGE_SIZE, PageAllocError, PageAllocator};
 
-// 使用 SPEC 的固定页大小，避免测试与实现同时采用错误的常量。
-const PAGE_SIZE: usize = 4096;
 const START: usize = 0x1000;
 const END: usize = 0x4000;
 
@@ -21,18 +19,23 @@ fn assert_managed_pages(mut pages: [usize; 3]) {
     assert_eq!(pages, [START, START + PAGE_SIZE, END - PAGE_SIZE]);
 }
 
-/// 构造必须清除原有占用标记，但不能修改管理范围之外的存储。
+/// 页大小固定为 MM-001 规定的 4096 字节。
+#[test]
+fn page_size_matches_mm001() {
+    assert_eq!(PAGE_SIZE, 4096);
+}
+
+/// 初始化只清除管理范围内的占用标记。
 #[test]
 fn initializes_only_managed_flags() {
     let mut used = [true, true, true, false, true];
     {
         let _allocator = PageAllocator::new(START, END, &mut used).unwrap();
     }
-    // 借用结束后检查调用者的数组，不读取分配器的私有字段。
     assert_eq!(used, [false, false, false, false, true]);
 }
 
-/// 单独验收空范围的构造，不依赖后续的分配和释放实现。
+/// 空范围初始化成功，且不修改任何标记。
 #[test]
 fn accepts_empty_ranges_without_modifying_metadata() {
     for start in [0, START] {
@@ -81,7 +84,7 @@ fn checks_range_before_metadata_capacity() {
     }
 }
 
-/// 容量不足时不能先清除部分标记；也检查传入切片之外的存储。
+/// 标记容量不足时，传入切片及其之外的存储均保持不变。
 #[test]
 fn rejects_short_metadata_without_changing_flags() {
     for length in [0, 1, 2] {

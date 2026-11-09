@@ -5,6 +5,7 @@
 /// 每个物理页的大小，单位为字节。
 const PAGE_SIZE: usize = 4096;
 
+/// 页分配器初始化、分配或回收失败的原因。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageAllocError {
     /// 地址范围反向，或任一边界未按 4096 字节对齐。
@@ -19,25 +20,24 @@ pub enum PageAllocError {
     NotAllocated,
 }
 
-/// 借用调用者的页状态标记；只管理数值地址，不访问页内容。
+/// 管理 `[start, end)` 内的 4096 字节物理页，支持分配、回收和复用。
 ///
-/// 生命周期将分配器与标记存储关联，标记借用期间不能由调用者修改。
+/// 返回空闲页的页首地址，检查耗尽和非法释放；不访问或清零页内容。
 pub struct PageAllocator<'a> {
     /// 管理范围的起始地址，按页对齐。
     start: usize,
     /// 管理范围的结束地址，按页对齐且不包含在范围内。
     end: usize,
-    /// 仅保留管理范围需要的标记，多余存储不参与分配。
-    /// 每页一个标记：`false` 为空闲，`true` 为已分配。
+    /// 每页一个占用标记（`true` 为已分配），仅覆盖管理范围。
     used: &'a mut [bool],
 }
 
 impl<'a> PageAllocator<'a> {
-    /// 使用调用者的标记存储，初始化半开地址范围 `[start, end)` 的管理状态。
+    /// 创建页分配器，将 `[start, end)` 内的页标记为空闲。
     ///
     /// # 参数
     /// - `start`、`end`：均须按页对齐，且 `start <= end`；允许空范围。
-    /// - `used`：每页一个标记，长度至少为总页数，由分配器独占借用。
+    /// - `used`：调用者提供的页状态存储，每页一个标记，长度至少为总页数。
     ///
     /// # 返回与错误
     /// 成功时只将管理范围需要的标记设为空闲，多余标记不变。
@@ -63,7 +63,6 @@ impl<'a> PageAllocator<'a> {
     /// 返回一个范围内、按页对齐且当前未占用的页首地址，并标记为已分配。
     ///
     /// 不约定分配顺序；耗尽返回 [`PageAllocError::OutOfMemory`]，状态不变。
-    /// 不清零页内容，也不提供并发访问。
     pub fn alloc(&mut self) -> Result<usize, PageAllocError> {
         let index = self
             .used

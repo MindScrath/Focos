@@ -15,6 +15,7 @@
 | 11/6 HAL-001 | Codex 实现用户起草的块设备规格，包括 `BlockDevice`、`MemoryDisk`、开发机测试和文档 | 先运行 9 项测试确认内存盘尚未实现，再补齐实现和字节顺序用例。10 项开发机测试与 QEMU 启动回归均通过。同步错误来自测试设备的故障注入。接口和同步语义仍需人工审阅。[PR #26](https://github.com/MindScrath/Focos/pull/26) · [CI 记录](https://github.com/MindScrath/Focos/actions/runs/42389431603) |
 | 11/8 页分配规格 | Codex 辅助起草 [MM-001](../specs/MM-001.md)，作者已审阅 | 文档与链接检查通过，规格已通过 [PR #27](https://github.com/MindScrath/Focos/pull/27) 合入 |
 | 11/8 页分配与回收 | Codex 按 [MM-001](../specs/MM-001.md) 编写测试和实现，作者已审阅全部代码 | 测试先失败后通过；`make check` 通过，包含 17 项页分配测试、10 项块设备测试及 QEMU 启动回归。未接入真实内存，待两名队友审阅。日志保留在本地 `target/evidence/` |
+| 11/9 页分配审阅调整 | 统一页分配接口与测试注释，测试共用页大小常量并补规格断言，作者已审阅全部代码 | `make check` 与测试代码 Clippy 通过，28 项测试通过；待队友复审 |
 
 初始化提交：`46222643e3c2c2e25521684b0d30d37ab20abee6`。此次规划未导入第三方内核实现。首次真板启动的实现和证据在 [PR #16](https://github.com/MindScrath/Focos/pull/16)独立审阅，不能以本文代替板上日志。
 
