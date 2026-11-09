@@ -6,7 +6,7 @@
 
 ## 一句话结论
 
-11 组都能在参考环境产出可判分的真实输出；5 个可作 stdin 判分的官方 judge + 5 个团队 judge 均未崩溃，缺项按 0 计（lmbench 使用团队解析器；官方 `lmbench.sh` 是运行器，不是 stdin 判分器）。发现 3 个镜像/判分侧的硬问题：basic 的 musl 二进制实际是 glibc 构建、busybox judge 多一个 `kill 10`、libctest 镜像少 3 项。参考环境的完整结果见第 3 节。
+11 组都能在参考环境产出可判分的真实输出；5 个可作 stdin 判分的官方 judge + 6 个团队判据均未崩溃，缺项按 0 计（lmbench 使用团队解析器；官方 `lmbench.sh` 是运行器，不是 stdin 判分器）。发现 3 个镜像/判分侧的硬问题：basic 的 musl 二进制实际是 glibc 构建、busybox judge 多一个 `kill 10`、libctest 镜像少 3 项。参考环境的完整结果见第 3 节。
 
 ## 1. 参考环境
 
@@ -18,7 +18,7 @@
 | 内核 apk SHA256 | `06454180443143009db6c36e1bcd9300871c65c5b2d9f41697007db51455994c` |
 | 解压后 `Image` SHA256 | `d80d8505dfd15de0f656b4a4b5c2e3213dcbc1dc427898288cb1527751084928` |
 | 测试镜像 | `pre-20250615/sdcard-rv.img`，解压后 SHA256 `95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8` |
-| initramfs | 自制，SHA256 `f579c71226da0039bf309853454ac8c7b2369da93972219bfaad0eecfbabaed8` |
+| initramfs | `scripts/ref/build_initramfs.py` 生成；本次 SHA256 `f579c71226da0039bf309853454ac8c7b2369da93972219bfaad0eecfbabaed8` |
 
 启动命令（关键参数）：
 
@@ -74,7 +74,7 @@ initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virt
 5. **lmbench 的官方 judge 不是 stdin 判分器**：`judge/lmbench.sh` 会执行命令；团队解析器按真实标签校准后，前 11 项正确。`lat_proc fork` 在最小参考环境挂住，说明后续项需要完整进程/文件环境。
 6. **unixbench 的 SHELL 项**：`SHELL1/8/16` 没有输出 `Unixbench ... test(lpm):` 行；团队判据按缺项 0 分处理，24/27。需要真实 FOCOS 输出再确认是环境问题还是实现问题。
 7. **netperf 的 `AI_ADDRCONFIG`**：只有 loopback 时 `getaddrinfo("127.0.0.1")` 返回 `EAI_NONAME`；加 `dummy0` 后 5/5。这说明运行环境需要至少一个非 loopback IPv4 地址。
-8. **判分器稳定性**：11 组、5 个 stdin 官方 judge + 5 个团队 judge（lmbench 用团队解析器），全部无 `JUDGE_ERROR`；缺组/缺输出/START 无 END 的负向行为已在 `scripts/tests/test_runner.py` 覆盖。
+8. **判分器稳定性**：11 组、5 个 stdin 官方 judge + 6 个团队判据（lmbench 用团队解析器），全部无 `JUDGE_ERROR`；缺组/缺输出/START 无 END 的负向行为已在 `scripts/tests/test_runner.py` 覆盖。
 
 ## 5. 这些结果不能怎么用
 
@@ -85,7 +85,7 @@ initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virt
 
 ## 6. 复现与后续
 
-参考运行的工具链（QEMU 9.2.4、Alpine 6.18.60、自制 initramfs）没有入库，避免把第三方内核二进制带进仓库；上表的 URL/SHA256 和启动命令足以复现。后续如果要长期保留基线，建议把 initramfs 构建脚本参数化后放进 `scripts/ref/`，并把内核版本锁进 `tests/sources.lock.json`。
+参考运行的构建脚本已入库：[scripts/ref/build_initramfs.py](../../scripts/ref/build_initramfs.py)，使用说明见 [scripts/ref/README.md](../../scripts/ref/README.md)；2026-11-08 的 11 组摘要见 [tests/results/reference-2026-11-08/summary.md](../../tests/results/reference-2026-11-08/summary.md)。第三方 QEMU/内核二进制不入库，只锁 URL/SHA256；原始串口日志含二进制且体积较大，未入库，按脚本重跑可得到同样日志。
 
 FOCOS 侧的下一步：
 

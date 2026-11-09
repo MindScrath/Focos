@@ -18,6 +18,7 @@
 | 11/8 TEST-001 | 下载并校验 2025 初赛镜像；展开 11 组 427 项清单；审计官方 judge 覆盖与镜像差异；起草 [TEST-001](../specs/TEST-001.md)、[inventory](reference/test-inventory.md) 与 runner | 镜像压缩包 SHA256 与 release 元数据一致；11 组脚本逐行对比；5 个官方 judge 空输入均返回全部子用例且全 0；runner 9 项负向测试与 11 组烟测通过；并用 Alpine Linux 6.18.60 + QEMU 9.2.4 跑通参考串口日志（11 组真实结果，见 [reference-run](reference/reference-run.md)）。FOCOS 集成或真板未跑；busybox 1 项、libctest 3 项不可达，验收口径待负责人确认 |
 | 11/9 页分配审阅调整 | 统一页分配接口与测试注释，测试共用页大小常量并补规格断言，作者已审阅全部代码 | `make check` 与测试代码 Clippy 通过，28 项测试通过；待队友复审 |
 | 11/9 真实内存接入规格 | Codex 按模板起草 [MM-002](../specs/MM-002.md)，核对现有启动代码、QEMU/OpenSBI 固定版本来源；作者已审阅 | 模板、事实与链接检查通过；仅规格草案，待另外两名队友审阅。未实现内存接入，未运行新增测试或 `make check` |
+| 11/9 review 修正 | 按 Codex review 修正 iozone fallback、423/427 按 libc 分列、官方/团队 5/6 计数；补参考运行 harness 与摘要 | 复核 judge 空输入与真实日志的 dup2 输出名为 `test_dup2`；重建 initramfs 并跑 lua 双 libc 9/9；未改内核 |
 
 初始化提交：`46222643e3c2c2e25521684b0d30d37ab20abee6`。此次规划未导入第三方内核实现。首次真板启动的实现和证据在 [PR #16](https://github.com/MindScrath/Focos/pull/16)独立审阅，不能以本文代替板上日志。
 

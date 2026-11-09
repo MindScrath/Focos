@@ -64,7 +64,8 @@
         "test_waitpid",
         "test_write",
         "test_yield"
-      ]
+      ],
+      "note": "judge_basic.py 内部类名 dup2_test，输出名 test_dup2；清单使用输出名"
     },
     "busybox": {
       "kind": "official",
@@ -371,7 +372,6 @@
     "iozone": {
       "kind": "official",
       "judge_file": "judge_iozone.py",
-      "fallback_judge_file": "judge_team/judge_iozone.py",
       "subcases": [
         "iozone write/read 4 initial writers (kb/sec)",
         "iozone write/read 4 rewriters (kb/sec)",
@@ -394,7 +394,7 @@
         "iozone pwritev/preadv 4 initial writers (kb/sec)",
         "iozone pwritev/preadv 4 rewriters (kb/sec)"
       ],
-      "note": "官方脚本存在 result/res 字段错误，正数结果会 KeyError；保留 fallback",
+      "note": "官方 judge 的 res 笔误只影响 latency 键；iozone baseline 全是 kb/sec，正常判分，不设 fallback",
       "mode": "performance"
     },
     "unixbench": {

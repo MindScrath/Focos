@@ -13,6 +13,7 @@
 - **输入**：一份完整串口日志，或一条会被执行并捕获 stdout 的命令（如 QEMU）。镜像、源码、judge 的版本来自 `tests/inventory.json`，runner 不自行推断版本。
 - **组切分**：以 `#### OS COMP TEST GROUP START <name> ####` / `END <name> ####` 为界。`<name>` 若以 `-musl`/`-glibc` 结尾，去掉后缀得到组名，并把后缀记为 libc；没有后缀时使用 `--libc`。同一 `(组, libc)` 只保留一段。
 - **判分**：官方组调用 `judge_<group>.py`，团队组调用 `scripts/judge_team/judge_<group>.py`；两者都用 stdin 传入组段文本，stdout 必须是 JSON 列表。runner 不改官方 judge 的判分规则。
+- **无 fallback**：官方 judge 缺失、超时、非零退出或输出不是合法 JSON 时一律 `JUDGE_ERROR`，不得自动改用团队判据。`iozone` 的 `res` 笔误只影响 latency 键；其 baseline 全是 `kb/sec`，官方 judge 可正常判分。
 - **状态**：
   - `PASS`：清单内全部子用例 `pass == all`；
   - `PARTIAL`：部分子用例通过或有分数；
@@ -46,5 +47,6 @@
 
 - 输入版本：[test-inventory.md](../docs/reference/test-inventory.md)、[inventory.json](../tests/inventory.json)；
 - 官方 judge：`oscomp/oskernel-testsuits-cooperation@44fa7ac`，用 `scripts/fetch_judges.py` 拉取，不入库；
+- 参考运行：`docs/reference/reference-run.md`、`scripts/ref/build_initramfs.py`、`tests/results/reference-2026-11-08/summary.md`；
 - 真实执行依赖 [#2](https://github.com/MindScrath/Focos/issues/2)、[#4](https://github.com/MindScrath/Focos/issues/4)、[#5](https://github.com/MindScrath/Focos/issues/5)、[#7](https://github.com/MindScrath/Focos/issues/7)、[#22](https://github.com/MindScrath/Focos/issues/22)、[#23](https://github.com/MindScrath/Focos/issues/23)、[#24](https://github.com/MindScrath/Focos/issues/24)；
 - 本改动不涉及 HAL/ABI/内存安全/持久化语义，普通 PR 一名非作者批准即可；若后续修改 CI 必过集合，需再一名成员确认。
