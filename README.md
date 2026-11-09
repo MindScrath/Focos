@@ -68,11 +68,7 @@ Focos/
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
 ├── scripts/                           # 构建与验证辅助脚本
-│   ├── smoke.py                       # 检查 QEMU 启动标记和退出状态
-│   ├── run_tests.py                   # TEST-001 串口切组、判分与结果汇总
-│   ├── fetch_judges.py                # 按固定 commit 拉取官方 judge
-│   ├── judge_team/                    # 5 组无官方 judge 的团队判据
-│   └── tests/                         # runner 的负向与契约测试
+│   └── smoke.py                       # 检查 QEMU 启动标记和退出状态
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
 │   ├── inventory.json                 # TEST-001 冻结的 427 项子用例清单
@@ -91,6 +87,7 @@ Focos/
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
+│       ├── reference-run.md           # TEST-001 参考 Linux 判分基线与限制
 │       ├── test-audit.md              # 历史测评分支与测例审计
 │       └── test-inventory.md          # TEST-001 输入冻结、逐组清单与差异
 ├── .cargo/                            # Cargo 的仓库级配置
