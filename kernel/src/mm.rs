@@ -1,9 +1,11 @@
 //! MM-001：物理页分配与回收。
 //!
-//! 管理页地址与占用状态，不访问物理内存；真实内存接入由调用者负责。
+//! 页分配器只管理页地址与占用状态，不访问物理内存；`self_test` 提供独立读写自检。
+
+pub mod self_test;
 
 /// 每个物理页的大小，单位为字节。
-const PAGE_SIZE: usize = 4096;
+pub const PAGE_SIZE: usize = 4096;
 
 /// 页分配器初始化、分配或回收失败的原因。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

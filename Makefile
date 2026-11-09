@@ -1,4 +1,4 @@
-.PHONY: all build fmt lint test smoke check clean
+.PHONY: all build fmt lint test smoke mm-smoke check clean
 
 TARGET := riscv64gc-unknown-none-elf
 HOST_TARGET := $(shell rustc -vV | sed -n 's/^host: //p')
@@ -17,9 +17,13 @@ lint:
 
 test:
 	cargo test --locked -p focos-kernel --lib --target $(HOST_TARGET)
+	python3 -B -m unittest discover -s scripts -p 'test_*.py'
 
 smoke: build
 	python3 scripts/smoke.py
+
+mm-smoke: build
+	python3 scripts/smoke.py --mm
 
 check: fmt lint test smoke
 

@@ -28,9 +28,11 @@ make check
 
 `origin` 是个人 fork，`upstream` 是团队仓库。分支名中的 `1` 换成认领的 Issue 编号。
 
-`make check` 检查格式和 clippy，运行开发机单元测试，再构建内核并检查 QEMU 启动。全部通过时，终端会显示 `test result: ok` 和 `PASS: BOOT-001`，命令正常退出。
+`make check` 检查格式和 clippy，运行 Rust 开发机测试与 Python 检查器测试，再构建内核并检查 QEMU 启动。全部通过时，终端会显示 `test result: ok`、检查器测试的 `OK` 和 `PASS: BOOT-001`，命令正常退出。
 
-单独验证 [HAL-001 内存盘](../specs/HAL-001.md) 用 `make test`，结果和失败断言显示在终端。只编译用 `make build`，只跑启动流程用 `make smoke`，启动日志在 `target/evidence/boot-qemu-rv.log`。
+单独验证页分配、[HAL-001 内存盘](../specs/HAL-001.md) 和检查器用 `make test`，结果和失败断言显示在终端。只编译用 `make build`，只跑启动流程用 `make smoke`，启动日志在 `target/evidence/boot-qemu-rv.log`。
+
+[MM-002 真实内存接入](../specs/MM-002.md) 另跑 `make mm-smoke`，通过时显示 `PASS: MM-002`。本步固定 QEMU 8.2.2 / OpenSBI 1.3.1；版本不符时先核对环境，不能直接沿用保留区假设。实际内存范围、版本、命令和退出结果保存在 `target/evidence/mm-qemu-rv.log`；带 `dirty` 的源码版本表示工作区还有未提交改动。
 
 | 遇到问题 | 先检查 |
 | --- | --- |

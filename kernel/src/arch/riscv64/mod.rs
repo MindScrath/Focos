@@ -1,7 +1,13 @@
+pub mod memory;
+
+#[cfg(target_arch = "riscv64")]
 use core::arch::{asm, global_asm};
 
+#[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("entry.S"));
 
+/// 通过 OpenSBI 控制台输出一个字节。
+#[cfg(target_arch = "riscv64")]
 pub fn console_putchar(byte: u8) {
     // SAFETY: 在 S 模式向 OpenSBI 调用传统控制台接口，无指针参数。
     unsafe {
@@ -15,6 +21,8 @@ pub fn console_putchar(byte: u8) {
     }
 }
 
+/// 请求固件正常或失败关机；不支持关机时停机等待。
+#[cfg(target_arch = "riscv64")]
 pub fn shutdown(failed: bool) -> ! {
     // SAFETY: SBI SRST 的类型 0 为关机，原因 0/1 分别为正常/失败。
     unsafe {
