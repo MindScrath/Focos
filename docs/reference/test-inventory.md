@@ -91,6 +91,8 @@
 
 ## 6. 复现入口
 
+下面命令依赖 runner 与团队判据，它们**不在本 PR**，而在 PR #2（`feat/8-test-runner`，https://github.com/MindScrath/Focos/compare/main...Weibo-Hd:feat/8-test-runner ）。本 PR 只提供清单、SPEC 和参考运行 harness。runner 的固定版本用标签 `test-001-runner-2026-11-08` 检出；PR #2 尚未合入，合入后以 merge commit 为准。
+
 ```bash
 # 1. 拉取官方 judge（固定 commit，不入库）
 python scripts/fetch_judges.py
@@ -107,7 +109,7 @@ TEST001_JUDGE_DIR=third_party/oskernel-testsuits-cooperation/judge \
   python -m unittest discover -s scripts/tests -v
 ```
 
-参考运行 harness 见 [scripts/ref/README.md](../../scripts/ref/README.md)；2026-11-08 的 11 组摘要见 [summary](../../tests/results/reference-2026-11-08/summary.md)。
+参考运行 harness 见 [scripts/ref/README.md](../../scripts/ref/README.md)；2026-11-08 的 11 组摘要见 [summary](../../tests/results/reference-2026-11-08/summary.md)；原始日志与逐项判分结果见 [证据归档](https://github.com/Weibo-Hd/Focos/releases/tag/test-001-evidence-2026-11-08)。
 
 ## 7. 参考运行与尚未完成
 

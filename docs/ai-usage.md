@@ -20,6 +20,7 @@
 | 11/9 真实内存接入规格 | Codex 按模板起草 [MM-002](../specs/MM-002.md)，核对现有启动代码、QEMU/OpenSBI 固定版本来源；作者已审阅 | 模板、事实与链接检查通过；仅规格草案，待另外两名队友审阅。未实现内存接入，未运行新增测试或 `make check` |
 | 11/9 review 修正 | 按 Codex review 修正 iozone fallback、423/427 按 libc 分列、官方/团队 5/6 计数；补参考运行 harness 与摘要 | 复核 judge 空输入与真实日志的 dup2 输出名为 `test_dup2`；重建 initramfs 并跑 lua 双 libc 9/9；未改内核 |
 | 11/11 队友 review 修正 | 按 hellorester 意见修正 423/427 百分比（99.1%），并把参考 init 的 `REF_MODULES_OK`/`REF_MOUNT_OK` 改为条件输出 | 用修正脚本重建 initramfs（SHA256 `9aea7671…`）跑 lua 双 libc 9/9；另用 4 MiB 非 ext4 盘做负向验证，只输出 `REF_FAIL mount-ext4` 和关机，无 `REF_MOUNT_OK`；未改内核 |
+| 11/11 队友 review 二轮 | 按 ApolloMonasa 意见修 `--network-dummy` 提取 dummy、把 runner 依赖标注到 PR #2、补原始证据归档 | 用真实 APK 构建成功且 init 含 dummy 加载；用缺 dummy 的合成 APK 验证报错退出；证据包 7 份日志 + 15 组 summary.json + SHA256SUMS，归档 SHA256 `8e55f993…`；未重跑完整 QEMU |
 
 初始化提交：`46222643e3c2c2e25521684b0d30d37ab20abee6`。此次规划未导入第三方内核实现。首次真板启动的实现和证据在 [PR #16](https://github.com/MindScrath/Focos/pull/16)独立审阅，不能以本文代替板上日志。
 

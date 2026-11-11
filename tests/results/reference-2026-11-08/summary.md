@@ -24,6 +24,13 @@
 ## 边界
 
 - 只跑 glibc 的性能组是为节省时间；basic/libctest/busybox/lua 跑了双 libc。
-- 原始串口日志含二进制/体积较大，未入库；本摘要与 `reference-run.md` 是提交的证据。需要原始日志时按 `scripts/ref/README.md` 重跑。
+- 原始串口日志与逐项判分结果不入库，已归档到 [test-001-evidence-2026-11-08](https://github.com/Weibo-Hd/Focos/releases/tag/test-001-evidence-2026-11-08)（`test-001-evidence-2026-11-08.tar.gz`，SHA256 `8e55f993507a9cd7eb4ad9d01dd6f4f0c2b243db5e470604c3b9836bb703c8fd`）；包内含 7 份 `logs/*.log`、15 组 `results/*/summary.json`、运行参数和 `SHA256SUMS`。
 - 参考运行做了 symlink、chmod、hosts、dummy0 适配，不能当作“原版镜像直接兼容”的证据。
 - 不能把 glibc 结果外推到 musl；basic/libctest 的 musl 结果被镜像构建问题污染。
+
+## 原始证据
+
+- 归档：https://github.com/Weibo-Hd/Focos/releases/tag/test-001-evidence-2026-11-08
+- 归档 SHA256：`8e55f993507a9cd7eb4ad9d01dd6f4f0c2b243db5e470604c3b9836bb703c8fd`
+- 校验：解包后 `sha256sum -c SHA256SUMS`（Windows 可用 `certutil -hashfile` 逐项核对）。
+- 判分版本：官方 judge `oscomp/oskernel-testsuits-cooperation@44fa7ac`；runner 见 PR #2 标签 `test-001-runner-2026-11-08`。

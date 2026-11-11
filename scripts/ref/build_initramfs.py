@@ -59,7 +59,9 @@ def extract_busybox(image: Path, explicit: Path | None) -> bytes:
         handle.close()
 
 
-def extract_kernel_and_modules(apk: Path, release: str, kernel_out: Path, modules_dir: Path) -> list[str]:
+def extract_kernel_and_modules(
+    apk: Path, release: str, kernel_out: Path, modules_dir: Path, extra: tuple[str, ...] = ()
+) -> list[str]:
     kernel_out.parent.mkdir(parents=True, exist_ok=True)
     modules_dir.mkdir(parents=True, exist_ok=True)
     found: list[str] = []
@@ -71,7 +73,8 @@ def extract_kernel_and_modules(apk: Path, release: str, kernel_out: Path, module
         kernel = gzip.decompress(tar.extractfile(kernel_name).read())
         kernel_out.write_bytes(kernel)
 
-        for module in MODULES:
+        targets = MODULES + [m for m in extra if m not in MODULES]
+        for module in targets:
             candidates = [n for n in names if n.endswith(f"/{module}.ko.gz")]
             if not candidates:
                 continue
@@ -164,7 +167,10 @@ def main() -> int:
     if not all(libc in ("glibc", "musl") for libc in args.libcs):
         raise SystemExit("--libcs must be glibc and/or musl")
 
-    modules = extract_kernel_and_modules(args.kernel_apk, args.release, args.kernel_out, args.modules_dir)
+    extra_modules = ("dummy",) if args.network_dummy else ()
+    modules = extract_kernel_and_modules(
+        args.kernel_apk, args.release, args.kernel_out, args.modules_dir, extra_modules
+    )
     if args.network_dummy and "dummy" not in modules:
         raise SystemExit("--network-dummy requires dummy.ko in the apk")
 

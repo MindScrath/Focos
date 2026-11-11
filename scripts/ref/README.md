@@ -36,7 +36,7 @@ python scripts/ref/build_initramfs.py \
 4. 生成 newc cpio + gzip 的 initramfs；
 5. 打印可直接运行的 QEMU 命令。
 
-需要 netperf 时加 `--network-dummy`：加载 `dummy.ko` 并配置 `dummy0 10.0.0.1/24`。只有 loopback 时，`getaddrinfo("127.0.0.1")` 可能因 `AI_ADDRCONFIG` 返回 `EAI_NONAME`。
+需要 netperf 时加 `--network-dummy`：从 APK 额外提取 `dummy.ko`，加载并配置 `dummy0 10.0.0.1/24`。只有 loopback 时，`getaddrinfo("127.0.0.1")` 可能因 `AI_ADDRCONFIG` 返回 `EAI_NONAME`。APK 里没有 `dummy.ko.gz` 时，脚本会在构建阶段直接报错退出，不会生成缺模块的 initramfs。
 
 ## 运行
 

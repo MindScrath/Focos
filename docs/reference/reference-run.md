@@ -74,7 +74,7 @@ initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virt
 5. **lmbench 的官方 judge 不是 stdin 判分器**：`judge/lmbench.sh` 会执行命令；团队解析器按真实标签校准后，前 11 项正确。`lat_proc fork` 在最小参考环境挂住，说明后续项需要完整进程/文件环境。
 6. **unixbench 的 SHELL 项**：`SHELL1/8/16` 没有输出 `Unixbench ... test(lpm):` 行；团队判据按缺项 0 分处理，24/27。需要真实 FOCOS 输出再确认是环境问题还是实现问题。
 7. **netperf 的 `AI_ADDRCONFIG`**：只有 loopback 时 `getaddrinfo("127.0.0.1")` 返回 `EAI_NONAME`；加 `dummy0` 后 5/5。这说明运行环境需要至少一个非 loopback IPv4 地址。
-8. **判分器稳定性**：11 组、5 个 stdin 官方 judge + 6 个团队判据（lmbench 用团队解析器），全部无 `JUDGE_ERROR`；缺组/缺输出/START 无 END 的负向行为已在 `scripts/tests/test_runner.py` 覆盖。
+8. **判分器稳定性**：11 组、5 个 stdin 官方 judge + 6 个团队判据（lmbench 用团队解析器），全部无 `JUDGE_ERROR`；缺组/缺输出/START 无 END 的负向行为由 PR #2 的 `scripts/tests/test_runner.py` 覆盖（该文件不在本 PR，以标签 `test-001-runner-2026-11-08` 为准）。
 
 ## 5. 这些结果不能怎么用
 
@@ -85,7 +85,7 @@ initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virt
 
 ## 6. 复现与后续
 
-参考运行的构建脚本已入库：[scripts/ref/build_initramfs.py](../../scripts/ref/build_initramfs.py)，使用说明见 [scripts/ref/README.md](../../scripts/ref/README.md)；2026-11-08 的 11 组摘要见 [tests/results/reference-2026-11-08/summary.md](../../tests/results/reference-2026-11-08/summary.md)。第三方 QEMU/内核二进制不入库，只锁 URL/SHA256；原始串口日志含二进制且体积较大，未入库，按脚本重跑可得到同样日志。
+参考运行的构建脚本已入库：[scripts/ref/build_initramfs.py](../../scripts/ref/build_initramfs.py)，使用说明见 [scripts/ref/README.md](../../scripts/ref/README.md)；2026-11-08 的 11 组摘要见 [tests/results/reference-2026-11-08/summary.md](../../tests/results/reference-2026-11-08/summary.md)。第三方 QEMU/内核二进制不入库，只锁 URL/SHA256。原始串口日志、逐项判分结果（`summary.json`）、运行参数和校验值已归档到 [test-001-evidence-2026-11-08](https://github.com/Weibo-Hd/Focos/releases/tag/test-001-evidence-2026-11-08)，归档 SHA256 `8e55f993507a9cd7eb4ad9d01dd6f4f0c2b243db5e470604c3b9836bb703c8fd`；重跑会产生新测量值，不能替代这份历史记录。
 
 FOCOS 侧的下一步：
 
