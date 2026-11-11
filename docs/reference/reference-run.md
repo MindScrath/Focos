@@ -18,7 +18,7 @@
 | 内核 apk SHA256 | `06454180443143009db6c36e1bcd9300871c65c5b2d9f41697007db51455994c` |
 | 解压后 `Image` SHA256 | `d80d8505dfd15de0f656b4a4b5c2e3213dcbc1dc427898288cb1527751084928` |
 | 测试镜像 | `pre-20250615/sdcard-rv.img`，解压后 SHA256 `95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8` |
-| initramfs | `scripts/ref/build_initramfs.py` 生成；本次 SHA256 `f579c71226da0039bf309853454ac8c7b2369da93972219bfaad0eecfbabaed8` |
+| initramfs | `scripts/ref/build_initramfs.py` 生成；2026-11-08 结果的构建 SHA256 `f579c71226da0039bf309853454ac8c7b2369da93972219bfaad0eecfbabaed8`，2026-11-11 修正启动标记后重建为 `9aea76713981d385b7243b2921e2957d280f3eaffb3153736b65e367cfb1fc3b`（lua 双 libc 复跑 9/9） |
 
 启动命令（关键参数）：
 
@@ -31,7 +31,7 @@ qemu-system-riscv64 \
   -device virtio-blk-device,drive=x0
 ```
 
-initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virtio_ring/virtio/virtio_mmio/virtio_blk/crc16/mbcache/jbd2/ext4/dummy` 模块，以及一个 `/init`：挂 proc/sys/dev，`insmod` 模块，挂载 `/dev/vda` 到 `/mnt`，`chroot` 进 `/mnt/glibc` 或 `/mnt/musl` 执行官方脚本。
+initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virtio_ring/virtio/virtio_mmio/virtio_blk/crc16/mbcache/jbd2/ext4/dummy` 模块，以及一个 `/init`：挂 proc/sys/dev，`insmod` 模块，挂载 `/dev/vda` 到 `/mnt`，`chroot` 进 `/mnt/glibc` 或 `/mnt/musl` 执行官方脚本。每个步骤都带 `|| fail`：只有确实成功才打印 `REF_MODULES_OK` / `REF_MOUNT_OK`，失败打印 `REF_FAIL <stage>` 并关机，不会出现“模块加载或挂载失败但仍然打印 OK”的情况（标记含义见 [scripts/ref/README.md](../../scripts/ref/README.md)）。
 
 ## 2. 参考环境做的打包适配（仅用于参考运行）
 

@@ -51,6 +51,20 @@ qemu-system-riscv64 \
 
 `-snapshot` 把写入放进临时 overlay，原始镜像不会被修改。串口日志用 `>` 重定向到文件，再交给 `scripts/run_tests.py --log` 判分。
 
+## 启动标记
+
+init 只在对应步骤**确实成功**后才打印标记，失败会先打印 `REF_FAIL <stage>` 再 `poweroff -f`：
+
+| 标记 | 含义 |
+| --- | --- |
+| `REF_MODULES_OK` | `virtio_ring/virtio/virtio_mmio/virtio_blk/crc16/mbcache/jbd2/ext4` 全部 `insmod` 成功 |
+| `REF_MOUNT_OK` | `/dev/vda` 已成功挂载为 ext4 到 `/mnt` |
+| `REF RUN <libc> <script>` | 即将在 chroot 中执行某组脚本（不代表该组通过） |
+| `REF_ALL_DONE` | 所有 libc × 脚本循环已结束 |
+| `REF_FAIL <stage>` | 某步失败，例如 `module-load:ext4`、`mount-ext4`、`bind-proc:glibc` |
+
+判分时只认组段内的 `OS COMP TEST GROUP` 标记；`REF_*` 只用于判断参考环境是否正常启动。
+
 ## 参考环境适配
 
 initramfs 会自动做这些**仅用于参考运行**的适配：

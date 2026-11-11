@@ -99,15 +99,16 @@ def entry(name: str, mode: int, data: bytes, ino: int) -> bytes:
 
 def build_init(libcs: list[str], scripts: list[str], modules: list[str], release: str, network: bool) -> str:
     module_lines = "\n".join(
-        f'  [ -f /lib/modules/{release}/{m}.ko ] && /busybox insmod /lib/modules/{release}/{m}.ko'
+        f'  [ -f /lib/modules/{release}/{m}.ko ] || fail "module-missing:{m}"\n'
+        f'  /busybox insmod /lib/modules/{release}/{m}.ko || fail "module-load:{m}"'
         for m in modules
     )
     libc_lines = []
     for libc in libcs:
         libc_lines.append(
-            f"""  /busybox mkdir -p /mnt/{libc}/proc /mnt/{libc}/dev /mnt/{libc}/tmp /mnt/{libc}/var/tmp /mnt/{libc}/bin
-  /busybox mount --bind /proc /mnt/{libc}/proc
-  /busybox mount --bind /dev /mnt/{libc}/dev
+            f"""  /busybox mkdir -p /mnt/{libc}/proc /mnt/{libc}/dev /mnt/{libc}/tmp /mnt/{libc}/var/tmp /mnt/{libc}/bin || fail "mkdir:{libc}"
+  /busybox mount --bind /proc /mnt/{libc}/proc || fail "bind-proc:{libc}"
+  /busybox mount --bind /dev /mnt/{libc}/dev || fail "bind-dev:{libc}"
   /busybox ln -sf /busybox /mnt/{libc}/bin/sh
   /busybox ln -sf /busybox /mnt/{libc}/bin/busybox
   /busybox ln -sf /busybox /mnt/{libc}/bin/ls
@@ -124,13 +125,18 @@ def build_init(libcs: list[str], scripts: list[str], modules: list[str], release
             libc_lines[-1] += f"  /busybox chroot /mnt/{libc} /busybox sh /{script}\n"
     body = "\n".join(libc_lines)
     return f"""#!/busybox sh
-/busybox mkdir -p /proc /sys /dev /mnt
-/busybox mount -t proc proc /proc
-/busybox mount -t sysfs sysfs /sys
-/busybox mount -t devtmpfs devtmpfs /dev
+fail() {{
+  /busybox echo "REF_FAIL $1"
+  /busybox poweroff -f
+  exit 1
+}}
+/busybox mkdir -p /proc /sys /dev /mnt || fail mkdir-root
+/busybox mount -t proc proc /proc || fail mount-proc
+/busybox mount -t sysfs sysfs /sys || fail mount-sys
+/busybox mount -t devtmpfs devtmpfs /dev || fail mount-dev
 {module_lines}
 /busybox echo "REF_MODULES_OK"
-/busybox mount -t ext4 /dev/vda /mnt
+/busybox mount -t ext4 /dev/vda /mnt || fail mount-ext4
 /busybox echo "REF_MOUNT_OK"
 {body}
 /busybox echo "REF_ALL_DONE"
