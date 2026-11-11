@@ -1,6 +1,6 @@
 # AI 辅助记录
 
-工具：Codex。AI 起草不等于人工审阅或板上验收；每个 PR 仍须提供实际测试和队友批准。原会话保留在本地，发布摘录先去除个人信息和凭据。
+工具：Codex、WorkBuddy。AI 起草不等于人工审阅或板上验收；每个 PR 仍须提供实际测试和队友批准。原会话保留在本地，发布摘录先去除个人信息和凭据。
 
 ## 已发生的工作
 
@@ -15,8 +15,12 @@
 | 11/6 HAL-001 | Codex 实现用户起草的块设备规格，包括 `BlockDevice`、`MemoryDisk`、开发机测试和文档 | 先运行 9 项测试确认内存盘尚未实现，再补齐实现和字节顺序用例。10 项开发机测试与 QEMU 启动回归均通过。同步错误来自测试设备的故障注入。接口和同步语义仍需人工审阅。[PR #26](https://github.com/MindScrath/Focos/pull/26) · [CI 记录](https://github.com/MindScrath/Focos/actions/runs/42389431603) |
 | 11/8 页分配规格 | Codex 辅助起草 [MM-001](../specs/MM-001.md)，作者已审阅 | 文档与链接检查通过，规格已通过 [PR #27](https://github.com/MindScrath/Focos/pull/27) 合入 |
 | 11/8 页分配与回收 | Codex 按 [MM-001](../specs/MM-001.md) 编写测试和实现，作者已审阅全部代码 | 测试先失败后通过；`make check` 通过，包含 17 项页分配测试、10 项块设备测试及 QEMU 启动回归。未接入真实内存，待两名队友审阅。日志保留在本地 `target/evidence/` |
+| 11/8 TEST-001 | 下载并校验 2025 初赛镜像；展开 11 组 427 项清单；审计官方 judge 覆盖与镜像差异；起草 [TEST-001](../specs/TEST-001.md)、[inventory](reference/test-inventory.md) 与 runner | 镜像压缩包 SHA256 与 release 元数据一致；11 组脚本逐行对比；5 个官方 judge 空输入均返回全部子用例且全 0；runner 9 项负向测试与 11 组烟测通过；并用 Alpine Linux 6.18.60 + QEMU 9.2.4 跑通参考串口日志（11 组真实结果，见 [reference-run](reference/reference-run.md)）。FOCOS 集成或真板未跑；busybox 1 项、libctest 3 项不可达，验收口径待负责人确认 |
 | 11/9 页分配审阅调整 | 统一页分配接口与测试注释，测试共用页大小常量并补规格断言，作者已审阅全部代码 | `make check` 与测试代码 Clippy 通过，28 项测试通过；待队友复审 |
 | 11/9 真实内存接入规格 | Codex 按模板起草 [MM-002](../specs/MM-002.md)，核对现有启动代码、QEMU/OpenSBI 固定版本来源；作者已审阅 | 模板、事实与链接检查通过；仅规格草案，待另外两名队友审阅。未实现内存接入，未运行新增测试或 `make check` |
+| 11/9 review 修正 | 按 Codex review 修正 iozone fallback、423/427 按 libc 分列、官方/团队 5/6 计数；补参考运行 harness 与摘要 | 复核 judge 空输入与真实日志的 dup2 输出名为 `test_dup2`；重建 initramfs 并跑 lua 双 libc 9/9；未改内核 |
+| 11/11 队友 review 修正 | 按 hellorester 意见修正 423/427 百分比（99.1%），并把参考 init 的 `REF_MODULES_OK`/`REF_MOUNT_OK` 改为条件输出 | 用修正脚本重建 initramfs（SHA256 `9aea7671…`）跑 lua 双 libc 9/9；另用 4 MiB 非 ext4 盘做负向验证，只输出 `REF_FAIL mount-ext4` 和关机，无 `REF_MOUNT_OK`；未改内核 |
+| 11/11 队友 review 二轮 | 按 ApolloMonasa 意见修 `--network-dummy` 提取 dummy、把 runner 依赖标注到 PR #2、补原始证据归档 | 用真实 APK 构建成功且 init 含 dummy 加载；用缺 dummy 的合成 APK 验证报错退出；证据包 7 份日志 + 15 组 summary.json + SHA256SUMS，归档 SHA256 `8e55f993…`；未重跑完整 QEMU |
 
 初始化提交：`46222643e3c2c2e25521684b0d30d37ab20abee6`。此次规划未导入第三方内核实现。首次真板启动的实现和证据在 [PR #16](https://github.com/MindScrath/Focos/pull/16)独立审阅，不能以本文代替板上日志。
 

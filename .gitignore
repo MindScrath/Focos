@@ -4,5 +4,10 @@
 *.img.xz
 *.log
 .env
+# 官方 judge 按固定 commit 拉取，不入库
+/third_party/
+# Python 缓存
+__pycache__/
+*.pyc
 # 省略IDE配置
 .idea
