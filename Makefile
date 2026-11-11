@@ -25,7 +25,7 @@ smoke: build
 mm-smoke: build
 	python3 scripts/smoke.py --mm
 
-check: fmt lint test smoke
+check: fmt lint test smoke mm-smoke
 
 clean:
 	cargo clean

@@ -5,7 +5,7 @@
 pub mod self_test;
 
 /// 每个物理页的大小，单位为字节。
-pub const PAGE_SIZE: usize = 4096;
+pub(crate) const PAGE_SIZE: usize = 4096;
 
 /// 页分配器初始化、分配或回收失败的原因。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

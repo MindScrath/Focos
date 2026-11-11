@@ -26,7 +26,7 @@ pub enum MemoryInitError {
 ///
 /// `kernel_end` 必须包含全部内核装载段，`dtb_start` 必须按 8 字节对齐。
 /// 两者须满足 MM-002 的 RAM 边界；越界、溢出或对齐后无完整页返回 `InvalidLayout`。
-pub fn usable_range(kernel_end: usize, dtb_start: usize) -> Result<Range<usize>, MemoryInitError> {
+fn usable_range(kernel_end: usize, dtb_start: usize) -> Result<Range<usize>, MemoryInitError> {
     if kernel_end < KERNEL_START
         || kernel_end >= dtb_start
         || dtb_start >= RAM_END
@@ -48,7 +48,7 @@ pub fn usable_range(kernel_end: usize, dtb_start: usize) -> Result<Range<usize>,
 /// 校验平台布局后创建页分配器，返回实际管理范围和独占借用标记的分配器。
 ///
 /// 先校验布局，再检查 `used` 容量；失败不修改标记，也不访问待分配页。
-pub fn init_page_allocator(
+fn init_page_allocator(
     kernel_end: usize,
     dtb_start: usize,
     used: &mut [bool],
