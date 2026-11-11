@@ -21,7 +21,7 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
     ));
     // SAFETY: arch 排除了固件、内核、启动栈、标记和设备树；关闭分页时这些地址就是 RAM。
     // 启动流程独占分配器，自检归还页后不保留引用，也没有其他内核任务访问这些页。
-    unsafe { focos_kernel::mm::self_test::check_pages(&mut allocator) }
+    unsafe { focos_kernel::mm::boot_check::check_pages(&mut allocator) }
         .unwrap_or_else(|error| panic!("memory self-test failed: {error:?}"));
     hal::console_write("FOCOS_MM_OK\n");
     hal::console_write("FocOS: early S-mode boot\nFOCOS_BOOT_OK\n");

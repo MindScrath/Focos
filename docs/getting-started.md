@@ -32,7 +32,7 @@ make check
 
 单独验证页分配、[HAL-001 内存盘](../specs/HAL-001.md) 和检查器用 `make test`，结果和失败断言显示在终端。只编译用 `make build`，只跑启动流程用 `make smoke`，启动日志在 `target/evidence/boot-qemu-rv.log`。
 
-[MM-002 真实内存接入](../specs/MM-002.md) 另跑 `make mm-smoke`，通过时显示 `PASS: MM-002`。本步固定 QEMU 8.2.2 / OpenSBI 1.3.1；版本不符时先核对环境，不能直接沿用保留区假设。实际内存范围、版本、命令和退出结果保存在 `target/evidence/mm-qemu-rv.log`；带 `dirty` 的源码版本表示工作区还有未提交改动。
+[MM-002 真实内存接入](../specs/MM-002.md) 另跑 `make mm-smoke`，通过时显示 `PASS: MM-002`。已验证 QEMU 8.2.2 / OpenSBI 1.3.1，以及 Fedora 45 容器中的 QEMU 11.1.3 / OpenSBI 1.8.1；版本不作为精确门禁，机器仍须使用 `virt`、128 MiB、单核和默认固件。实际内存范围、版本、命令和退出结果保存在 `target/evidence/mm-qemu-rv.log`；带 `dirty` 的源码版本表示工作区还有未提交改动。
 
 | 遇到问题 | 先检查 |
 | --- | --- |

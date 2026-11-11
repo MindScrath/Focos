@@ -1,4 +1,4 @@
-//! MM-002 的实际页读写自检；页分配器本身仍只管理地址和标记。
+//! MM-002 的启动页读写检查；页分配器本身仍只管理地址和标记。
 
 use super::{PAGE_SIZE, PageAllocError, PageAllocator};
 

@@ -1,4 +1,4 @@
-//! 用开发机真实分配的对齐缓冲区验证自检与清理，不解引用平台物理地址。
+//! 用开发机真实分配的对齐缓冲区验证启动页检查与清理，不解引用平台物理地址。
 
 use super::*;
 
@@ -7,7 +7,7 @@ struct Pages([u8; 3 * PAGE_SIZE]);
 
 /// 自检结束后归还两页，同时保留调用者已经持有的页及其内容。
 #[test]
-fn self_test_returns_pages_without_touching_existing_allocations() {
+fn boot_check_returns_pages_without_touching_existing_allocations() {
     let mut storage = Pages([0xa5; 3 * PAGE_SIZE]);
     let start = storage.0.as_mut_ptr() as usize;
     let mut used = [false; 3];

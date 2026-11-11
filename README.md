@@ -47,6 +47,7 @@ Focos/
 ├── AGENTS.md                          # 开发、文档与审阅约定
 ├── kernel/                            # Rust 裸机内核
 │   ├── Cargo.toml                     # 内核可执行文件与通用库的构建定义
+│   ├── build.rs                       # 跟踪裸机链接脚本的构建依赖
 │   └── src/                           # 内核源代码
 │       ├── main.rs                    # Rust 入口和 panic 处理
 │       ├── lib.rs                     # no_std 组件、平台接口与开发机测试入口
@@ -57,8 +58,8 @@ Focos/
 │       ├── mm.rs                      # 物理页分配、回收与错误类型
 │       ├── mm/                        # 页分配测试与真实页读写自检
 │       │   ├── tests.rs               # 分配、回收、耗尽与非法输入测试
-│       │   ├── self_test.rs           # 整页写读、释放后再分配与测试页清理
-│       │   └── self_test/             # 真实页自检的开发机验证
+│       │   ├── boot_check.rs          # 启动时整页写读、释放后再分配与测试页清理
+│       │   └── boot_check/            # 启动页读写检查的开发机验证
 │       │       └── tests.rs           # 页内容、回收与读回错误测试
 │       ├── hal.rs                     # 供内核调用的早期输出和关机接口
 │       └── arch/                      # 与 CPU 架构相关的实现
@@ -100,7 +101,7 @@ Focos/
 │   ├── pull_request_template.md       # 改动、验证与限制
 │   ├── main-protection.json           # main 分支保护的可复用配置
 │   └── workflows/                     # GitHub Actions 工作流
-│       └── ci.yml                     # PR 与 main 的构建和启动检查
+│       └── ci.yml                     # PR 与 main 的构建、启动和真实页检查
 ├── .gitignore                         # Git 忽略规则
 ├── Cargo.toml                         # Rust 工作区与构建配置
 ├── Cargo.lock                         # 锁定 Cargo 依赖版本

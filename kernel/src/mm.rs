@@ -1,8 +1,8 @@
 //! MM-001：物理页分配与回收。
 //!
-//! 页分配器只管理页地址与占用状态，不访问物理内存；`self_test` 提供独立读写自检。
+//! 页分配器只管理页地址与占用状态，不访问物理内存；`boot_check` 提供启动时的页读写检查。
 
-pub mod self_test;
+pub mod boot_check;
 
 /// 每个物理页的大小，单位为字节。
 pub(crate) const PAGE_SIZE: usize = 4096;

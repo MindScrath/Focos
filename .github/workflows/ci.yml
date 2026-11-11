@@ -27,6 +27,8 @@ jobs:
         run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --target riscv64gc-unknown-none-elf --no-self-update
       - name: Verify build and boot
         run: make check
+      - name: Verify MM-002 real pages
+        run: make mm-smoke
       - name: Keep boot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

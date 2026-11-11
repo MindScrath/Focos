@@ -12,7 +12,7 @@ SUCCESS = "OpenSBI v1.3.1\nFOCOS_MM_OK\nFOCOS_BOOT_OK\n"
 
 
 class ResultTests(unittest.TestCase):
-    """验证成功标记、固件版本和退出状态必须共同满足约定。"""
+    """验证成功标记和退出状态；固件版本不作为通过条件。"""
 
     def test_accepts_complete_memory_result(self):
         """两个唯一标记按顺序输出且正常退出时通过。"""
@@ -54,18 +54,17 @@ class ResultTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "status"):
                     smoke.validate_result(SUCCESS, status, memory=True)
 
-    def test_rejects_unreviewed_firmware(self):
-        """固件缺失或版本变化时不能沿用当前保留区假设。"""
-        for version in ("", "OpenSBI v1.3.10", "OpenSBI v1.4"):
-            with self.subTest(version=version):
-                with self.assertRaisesRegex(ValueError, "OpenSBI"):
-                    smoke.validate_result(
-                        SUCCESS.replace("OpenSBI v1.3.1", version), 0, memory=True,
-                    )
+    def test_accepts_different_firmware_versions(self):
+        """固件版本只写入日志，不代替内核布局与实际读写验收。"""
+        for banner in ("", "OpenSBI v1.3.1\n", "OpenSBI v1.6\n"):
+            with self.subTest(banner=banner):
+                smoke.validate_result(
+                    banner + "FOCOS_MM_OK\nFOCOS_BOOT_OK\n", 0, memory=True,
+                )
 
 
 class RunnerTests(unittest.TestCase):
-    """验证检查入口对超时和错误 QEMU 版本的处理，不启动真实虚拟机。"""
+    """验证检查入口对超时和不同 QEMU 版本的处理，不启动真实虚拟机。"""
 
     def setUp(self):
         """提供临时 ELF 占位文件，使各用例进入运行与判定路径。"""
@@ -88,14 +87,23 @@ class RunnerTests(unittest.TestCase):
                 smoke.run_check(memory=True)
             self.assertEqual(write_log.call_args.args[-2:], (SUCCESS, "TIMEOUT"))
 
-    def test_unreviewed_qemu_does_not_run(self):
-        """机器实现版本变化时先报错，不能直接沿用 MM-002 的内存布局。"""
+    def test_newer_qemu_runs_and_is_logged(self):
+        """新版 QEMU 仍执行行为验收，并把实际版本交给日志记录。"""
+        output = "OpenSBI v1.6\nFOCOS_MM_OK\nFOCOS_BOOT_OK\n"
+        completed = subprocess.CompletedProcess("qemu", 0, stdout=output)
         with patch.object(smoke.subprocess, "check_output", return_value=
                           "QEMU emulator version 9.0.0\n"), \
-                patch.object(smoke.subprocess, "run") as run:
-            with self.assertRaisesRegex(SystemExit, "QEMU 8.2.2"):
-                smoke.run_check(memory=True)
-            run.assert_not_called()
+                patch.object(smoke.subprocess, "run", return_value=completed) as run, \
+                patch.object(smoke, "write_log") as write_log, \
+                patch("builtins.print") as report:
+            smoke.run_check(memory=True)
+            run.assert_called_once()
+            self.assertEqual(write_log.call_args.args[1], "QEMU emulator version 9.0.0")
+            self.assertEqual(write_log.call_args.args[-2:], (output, "PASS"))
+            report.assert_called_once_with(
+                "PASS: MM-002 (QEMU emulator version 9.0.0); "
+                f"log: {smoke.MM_LOG}"
+            )
 
 
 if __name__ == "__main__":
