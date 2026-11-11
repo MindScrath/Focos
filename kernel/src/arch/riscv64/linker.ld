@@ -7,7 +7,7 @@ SECTIONS {
     . = ALIGN(4096);
     .rodata : { *(.rodata .rodata.*) *(.srodata .srodata.*) }
     . = ALIGN(4096);
-    .data : { *(.data .data.*) *(.sdata .sdata.*) *(.got .got.*) }
+    .data : { *(.data .data.*) *(.sdata .sdata.*) }
     . = ALIGN(4096);
     __bss_start = .;
     .bss (NOLOAD) : { *(.bss .bss.*) *(.sbss .sbss.*) *(COMMON) }
