@@ -62,7 +62,7 @@ flowchart TB
 
 ## 架构和板型分别选择
 
-以下路径均相对 `kernel/src/`，是拟采用的模块归属，`platform/`、`drivers/` 尚待创建；实际文件树仍以 README 为准。
+以下路径均相对 `kernel/src/`。`platform/qemu_riscv64/` 已接入固定 QEMU 启动内存；其他板型与 `drivers/` 尚待创建，实际文件树以 README 为准。
 
 | 拟定位置 | 适配单位 |
 | --- | --- |

@@ -1,2 +1,2 @@
 [target.riscv64gc-unknown-none-elf]
-rustflags = ["-C", "link-arg=-Tkernel/src/arch/riscv64/linker.ld", "-C", "link-arg=--no-relax"]
+rustflags = ["-C", "link-arg=-Tkernel/src/platform/qemu_riscv64/linker.ld", "-C", "link-arg=--no-relax"]

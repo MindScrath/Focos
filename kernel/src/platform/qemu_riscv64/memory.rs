@@ -1,4 +1,4 @@
-//! MM-002 的 QEMU virt 内存布局；仅适用于约定的 128 MiB、单 hart 启动。
+//! QEMU virt 的板级内存布局；保持 MM-002 的 128 MiB、单 hart 启动行为。
 
 use core::ops::Range;
 
@@ -59,16 +59,18 @@ fn init_page_allocator(
     Ok((range, allocator))
 }
 
-#[cfg(target_arch = "riscv64")]
+#[cfg(focos_platform = "qemu_riscv64")]
 static mut PAGE_FLAGS: [bool; MAX_PAGE_COUNT] = [false; MAX_PAGE_COUNT];
 
 /// 从链接符号和 OpenSBI 传入的设备树地址初始化启动页分配器。
 /// 标记位于内核静态区，由 `__kernel_end` 一并排除在可分配范围之外。
+/// `dtb_start` 仅参与边界与对齐校验，不解引用；非法布局返回 `InvalidLayout`。
 ///
 /// # Safety
 /// 仅可从 MM-002 约定的 QEMU 入口调用一次，且只有启动 hart、关闭中断和分页。
 /// `dtb_start` 必须是固件传入的设备树地址；不得另建管理同一内存区间的分配器。
-#[cfg(target_arch = "riscv64")]
+/// 启动流程独占返回的分配器和静态标记，不得重复初始化或创建别名可变借用。
+#[cfg(focos_platform = "qemu_riscv64")]
 pub unsafe fn boot_page_allocator(
     dtb_start: usize,
 ) -> Result<(Range<usize>, PageAllocator<'static>), MemoryInitError> {

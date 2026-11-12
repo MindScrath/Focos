@@ -1,6 +1,6 @@
 # PLAT-002：迁移 QEMU 板级配置与启动内存接入
 
-关联：[Issue #33](https://github.com/MindScrath/Focos/issues/33) · 父任务：[#4](https://github.com/MindScrath/Focos/issues/4) · 状态：草案
+关联：[Issue #33](https://github.com/MindScrath/Focos/issues/33) · 父任务：[#4](https://github.com/MindScrath/Focos/issues/4) · 状态：已实现（待审阅）
 
 ## 要做到什么
 
@@ -12,7 +12,7 @@
 
 ## 行为约定
 
-下表路径相对仓库根目录，目标路径随实现创建。
+下表记录迁移前后的文件归属，路径相对仓库根目录。
 
 | 现有内容 | 迁移后的归属 |
 | --- | --- |
@@ -34,7 +34,7 @@
 
 ## 怎样验收
 
-以下是实现 PR 的验收要求，本规格不表示迁移或新增检查已完成。
+以下是实现 PR 的验收要求，运行证据随 PR 提供；另一名成员独立复现仍待完成。
 
 | 场景 | 操作或测试入口 | 应看到什么 |
 | --- | --- | --- |

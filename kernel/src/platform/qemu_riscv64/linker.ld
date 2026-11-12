@@ -1,3 +1,4 @@
+/* QEMU virt 的内核加载布局；入口和启动栈由 RISC-V 启动汇编定义。 */
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
