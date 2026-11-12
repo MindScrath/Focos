@@ -47,7 +47,7 @@ Focos/
 ├── AGENTS.md                          # 开发、文档与审阅约定
 ├── kernel/                            # Rust 裸机内核
 │   ├── Cargo.toml                     # 内核可执行文件与通用库的构建定义
-│   ├── build.rs                       # 跟踪裸机链接脚本的构建依赖
+│   ├── build.rs                       # 校验裸机目标、选择板型并跟踪链接脚本
 │   └── src/                           # 内核源代码
 │       ├── main.rs                    # Rust 入口和 panic 处理
 │       ├── lib.rs                     # no_std 组件、平台接口与开发机测试入口
@@ -62,19 +62,23 @@ Focos/
 │       │   └── boot_check/            # 启动页读写检查的开发机验证
 │       │       └── tests.rs           # 页内容、回收与读回错误测试
 │       ├── hal.rs                     # 供内核调用的早期输出和关机接口
+│       ├── platform/                  # 板级资源、加载布局与启动装配
+│       │   ├── mod.rs                 # 统一导出当前板型接口
+│       │   └── qemu_riscv64/          # QEMU virt 固定配置
+│       │       ├── mod.rs             # 组织 QEMU 板级实现
+│       │       ├── linker.ld          # QEMU 内核加载地址和段布局
+│       │       ├── memory.rs          # 布局校验、静态标记与启动页分配
+│       │       └── memory/            # 板级内存布局测试
+│       │           └── tests.rs       # 保留区、地址边界与标记容量测试
 │       └── arch/                      # 与 CPU 架构相关的实现
 │           ├── mod.rs                 # 选择目标架构并导出接口
 │           └── riscv64/               # RISC-V 启动与 SBI 实现
 │               ├── entry.S            # 设置栈、清理 BSS 并进入 Rust
-│               ├── linker.ld          # 内核加载地址和段布局
-│               ├── mod.rs             # 调用 SBI 输出字符和关机
-│               ├── memory.rs          # QEMU 内存布局校验与启动页分配
-│               └── memory/            # 平台内存布局测试
-│                   └── tests.rs       # 保留区、地址边界与标记容量测试
+│               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
 │   ├── ARCH-001.md                    # CPU 机制与架构 ABI 边界（草案）
 │   ├── PLAT-001.md                    # 板型选择、启动资源与装配（草案）
-│   ├── PLAT-002.md                    # QEMU 板级配置与启动内存迁移（草案）
+│   ├── PLAT-002.md                    # QEMU 板级配置与启动内存迁移
 │   ├── DRV-001.md                     # 设备接入、DMA/IRQ 与错误（草案）
 │   ├── HAL-001.md                     # 块设备接口与内存盘
 │   ├── BOOT-001.md                    # QEMU 启动验收
@@ -84,6 +88,7 @@ Focos/
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
 │   ├── smoke.py                       # 检查 QEMU 启动与真实页读写结果
+│   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
