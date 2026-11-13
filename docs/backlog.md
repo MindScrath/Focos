@@ -9,7 +9,7 @@ PR #32 的架构约定已经合入，先把以下边界落实到实现与测试�
 | 子任务 | 第一份交付 | 对应主任务 |
 | --- | --- | --- |
 | [#33 抽离 QEMU 板级配置与启动内存](https://github.com/MindScrath/Focos/issues/33) | 列迁移清单、审 SPEC；保持现有布局和错误行为，回归 BOOT-001/MM-002 | #4 内存，与 #2 对齐板级入口 |
-| [#34 抽取共享块设备契约测试](https://github.com/MindScrath/Focos/issues/34) | 提取写后读与越界测试；先接 MemoryDisk，再保留真实驱动适配入口 | #3 设备，复用已完成的 #1 |
+| [#34 抽取共享块设备契约测试](https://github.com/MindScrath/Focos/issues/34) | 共享检查已入 `kernel/src/block/contract.rs`（含 VirtIO/SD 适配入口说明）；后端提供设备与专用测试盘后接入 | #3 设备，复用已完成的 #1 |
 | [#35 实现可嵌套本核临界区](https://github.com/MindScrath/Focos/issues/35) | 先写 QEMU RISC-V 开/关中断与嵌套状态测试，再实现接口 | #5 进程，与 #2 联调时钟 |
 
 #33/#34 是重构，#35 是新增能力。前两项可用现有基线独立推进；#35 状态测试可先做，关闭任务前还须完成真实定时中断验收。三个任务都不代表整个父任务完成。

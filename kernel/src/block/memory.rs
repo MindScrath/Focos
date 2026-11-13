@@ -86,3 +86,6 @@ impl BlockDevice for MemoryDisk<'_> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

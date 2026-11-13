@@ -42,7 +42,7 @@ make check
 | clippy 报错 | 按 `make lint` 输出的文件和行号修复，再复跑 |
 | 开发机测试找不到链接器 | 运行 `cc --version`，缺失时安装本机编译工具链。Ubuntu / Debian 用上面的 `build-essential` |
 | 开发机目标为空或不匹配 | 检查 `rustc -vV` 是否列出 `host:`，确认 sed 可用且 `HOST_TARGET` 未被覆盖 |
-| 开发机测试出现 `FAILED` | 用 `make test` 复跑，按失败用例名和断言定位。内存盘用例见 [`kernel/src/block/tests.rs`](../kernel/src/block/tests.rs) |
+| 开发机测试出现 `FAILED` | 用 `make test` 复跑，按失败用例名和断言定位。内存盘用例见 [`kernel/src/block/memory/tests.rs`](../kernel/src/block/memory/tests.rs)，契约负例见 [`kernel/src/block/contract/tests.rs`](../kernel/src/block/contract/tests.rs) |
 | 启动超时 | 日志、完整命令与当前 SHA；不要删断言 |
 
 修复后重跑 `make check`。如果检查在启动前失败，请用本次终端输出定位，已有启动日志可能来自上一次运行。
