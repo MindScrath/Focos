@@ -33,6 +33,13 @@
 
 引入第三方代码前核对许可证，在源码和设计/答辩材料注明来源。AI 辅助与人工复核见 [记录](ai-usage.md)。
 
+## 内核分页参考
+
+- [RISC-V 特权规范 20240411：Supervisor](https://docs.riscv.org/reference/isa/v20240411/priv/supervisor.html)：MM-003 的 Sv39、分页切换、地址转换缓存同步及异常语义依据。
+- [OpenSBI v1.3.1](https://github.com/riscv-software-src/opensbi/tree/v1.3.1)：核对已有 QEMU 环境中的异常转交；具体源码及借鉴范围见 [MM-003 参考页](reference/sv39-paging.md#规范依据)。
+
+本次仅起草规格，未引入外部实现代码；固定规范来源不代替实际运行验证。
+
 ## 多平台设计参考
 
 [KernelX 固定快照](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/tree/12ac84b6401cbddf75ca937ad485f8437cb3dc1d)（2026-11-11 源码检查）：
