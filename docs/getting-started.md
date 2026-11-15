@@ -47,6 +47,31 @@ make check
 
 修复后重跑 `make check`。如果检查在启动前失败，请用本次终端输出定位，已有启动日志可能来自上一次运行。
 
+## 当前 QEMU 平台运行配置
+
+本节与仓库一同版本管理，覆盖 [PLAT-002](../specs/PLAT-002.md) 的固定 QEMU 启动路径。构建时显示 `FocOS platform: qemu_riscv64`；Rust 目标用于编译，不会自动识别 VisionFive2 等硬件。
+
+| 项目 | 实际配置及来源 |
+| --- | --- |
+| 工具链与目标 | [rust-toolchain.toml](../rust-toolchain.toml)：Rust 1.99.0，`riscv64gc-unknown-none-elf` |
+| 板型与加载布局 | `qemu_riscv64`；[链接配置](../.cargo/config.toml) 使用[板级链接脚本](../kernel/src/platform/qemu_riscv64/linker.ld)，内核加载地址 `0x80200000` |
+| 机器、内存、核数 | `-machine virt -m 128M -smp 1`；RAM `[0x80000000, 0x88000000)` |
+| 固件与控制台 | `-bios default -nographic`，内核经 SBI 输出；实际 QEMU/OpenSBI 版本见当次日志 |
+| 加载方式与产物 | `-kernel target/riscv64gc-unknown-none-elf/release/focos-kernel`，产物为 RISC-V ELF；`-no-reboot` |
+| 设备与负载 | 未接入真实块设备、根文件系统、测试磁盘镜像和用户态初始程序；不传初始内存盘、自定义 DTB 或额外内存镜像 |
+
+在仓库根目录运行，构建与验收入口由 [Makefile](../Makefile) 提供：
+
+```sh
+make build
+make check
+make mm-smoke
+```
+
+完整 QEMU 命令以 [scripts/smoke.py](../scripts/smoke.py) 为准，日志也记录实际命令。布局、页读写及成功标记通过只证明当前启动自检，不代表用户程序或文件系统已运行。
+
+构建脚本拒绝其他裸机目标，开发机库测试仍通过 `make test` 运行。若要复现目标拒绝检查，先安装 `rustup target add riscv64imac-unknown-none-elf`，再运行 `cargo build --locked -p focos-kernel --lib --target riscv64imac-unknown-none-elf`；应由构建脚本报告 `unsupported bare-metal target`，缺少工具链不算通过。
+
 ## 3. 交第一份 PR
 
 1. 从 [任务入口](backlog.md) 选一项，在 Issue 认领并约 reviewer。

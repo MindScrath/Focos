@@ -5,3 +5,4 @@
 pub mod arch;
 pub mod block;
 pub mod mm;
+pub mod platform;

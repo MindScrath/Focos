@@ -1,4 +1,4 @@
-pub mod memory;
+//! RISC-V 的启动汇编与 SBI 调用。
 
 #[cfg(target_arch = "riscv64")]
 use core::arch::{asm, global_asm};
