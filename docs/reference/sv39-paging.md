@@ -1,6 +1,6 @@
 # MM-003 参考：页表、启动映射与验收
 
-本文细化 [MM-003](../../specs/MM-003.md) 的待审约定，不是实现或运行成绩。当前内核仍在关闭分页时执行 MM-002；#33 的板级迁移已由 [PR #39](https://github.com/MindScrath/Focos/pull/39) 合入，分页实现待本规格确认后推进。
+本页定义 [MM-003](../../specs/MM-003.md) 的页表接口、启动映射和验收条件，状态为待审草案。当前内核在关闭分页时执行 MM-002；分页接口与专项待实现。
 
 ## 接口与资源
 
@@ -43,7 +43,7 @@ pub unsafe trait VmMemory {
 - 申请失败不留下新占用或修改旧页，耗尽为 `OutOfMemory`。归还成功消耗句柄；失败返回原句柄及原始错误，分配标记和内容不变。来源不符返回 `InvalidAddress`，已不属于有效分配的页返回 `NotAllocated`。合法持有的页出现这些错误属于内部所有权故障，启动流程须失败关机。
 - `release_page` 的调用者保证持有有效句柄、所有访问已结束、临时映射已撤销并完成同步；服务先验证句柄来源与分配状态，再归还页。页表页还须已脱离全部可用页表，不能仍是活动根。基础恒等映射本身不表示页面仍被持有。`unsafe impl` 必须证明以上有效期、独占、来源与访问保证；清零不改变 MM-001 本身不访问页内容的约定。
 
-自检的 P、Q 在第一次 `new` 前申请。地址空间存活期间只通过独立的页句柄访问它们，不再次借用 `M`。页数、所有权和分配事件由测试适配器观察；可使用外置 `Cell` 计数器，不必给生产接口增加统计方法，也不能为读取统计重借用已被地址空间独占的服务。
+自检的 P、Q 在第一次 `new` 前申请。地址空间存活期间只通过独立的页句柄访问它们，不再次借用 `M`。页数、所有权和分配事件由测试适配器观察，可使用外置 `Cell` 计数器；统计方法不属于上述最小生产接口。读取统计时不得重借用已被地址空间独占的服务。
 
 ### 布局构造与创建校验
 
@@ -186,7 +186,7 @@ pub unsafe trait VmArch {
 
 ## 同步异常与探针
 
-本阶段只补内核分页自检所需的同步异常入口，不实现调度、时钟中断、用户上下文或系统调用。[#5 / CORE-001](https://github.com/MindScrath/Focos/issues/5) 当前是任务规划，尚未提供可依赖的异常接口 SPEC。因此本页定义所需的最小接口，由 MM-003 与 #5 的负责人共同审阅；不能仅引用该任务便视为接口已确定，也不据此宣称 #35 临界区或用户态能力完成。
+本阶段范围为内核分页自检所需的同步异常入口。最小接口由本页约定，并由 MM-003 与 [#5 / CORE-001](https://github.com/MindScrath/Focos/issues/5) 的负责人共同审阅。调度、时钟中断、用户上下文、系统调用及 #35 的临界区能力不在本阶段范围内。
 
 ```rust
 pub enum FaultKind { InstructionPage, LoadPage, StorePage }
@@ -286,4 +286,4 @@ arch 读取异常原因、故障指令地址和故障地址，转换为上述 `F
 - [OpenSBI v1.3.1 异常转交](https://github.com/riscv-software-src/opensbi/blob/v1.3.1/lib/sbi/sbi_hart.c)、[平台默认能力](https://github.com/riscv-software-src/opensbi/blob/v1.3.1/include/sbi/sbi_platform.h)、[通用平台](https://github.com/riscv-software-src/opensbi/blob/v1.3.1/platform/generic/platform.c)：核对已有环境的页异常转交路径；不同实际固件仍须通过运行验收。
 - [MM-001](../../specs/MM-001.md)、[MM-002](../../specs/MM-002.md)、[PLAT-002](../../specs/PLAT-002.md)、[ARCH-001](../../specs/ARCH-001.md)：复用页分配、机器布局和分层边界。[PR #31](https://github.com/MindScrath/Focos/pull/31) 的行为验收与独立专项约定继续保留。
 
-本次只依据规范和现有源码起草设计，未引入第三方实现代码，也未运行新增分页检查。用户态隔离后续与 #5/#23 单独约定。
+用户态隔离后续与 #5/#23 单独约定。

@@ -38,7 +38,7 @@
 - [RISC-V 特权规范 20240411：Supervisor](https://docs.riscv.org/reference/isa/v20240411/priv/supervisor.html)：MM-003 的 Sv39、分页切换、地址转换缓存同步及异常语义依据。
 - [OpenSBI v1.3.1](https://github.com/riscv-software-src/opensbi/tree/v1.3.1)：核对已有 QEMU 环境中的异常转交；具体源码及借鉴范围见 [MM-003 参考页](reference/sv39-paging.md#规范依据)。
 
-本次仅起草规格，未引入外部实现代码；固定规范来源不代替实际运行验证。
+以上资料用于 MM-003 的设计约定，未引入外部实现代码。运行证据由实现 PR 提供。
 
 ## 多平台设计参考
 
