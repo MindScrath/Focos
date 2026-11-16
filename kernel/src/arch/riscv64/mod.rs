@@ -1,4 +1,13 @@
-//! RISC-V 的启动汇编、SBI 调用与本核中断开关。
+//! RISC-V 的启动、分页、同步异常、SBI 调用与本核中断开关。
+
+mod fault;
+pub(crate) mod paging;
+#[cfg(target_arch = "riscv64")]
+pub use fault::{NativeFaultProbe, install_fault_probe, probe_return_code};
+#[cfg(target_arch = "riscv64")]
+mod vm_cpu;
+#[cfg(target_arch = "riscv64")]
+pub use vm_cpu::{NativeVmArch, init_vm_arch};
 
 #[cfg(target_arch = "riscv64")]
 use core::arch::{asm, global_asm};

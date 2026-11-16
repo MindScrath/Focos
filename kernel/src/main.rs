@@ -6,7 +6,7 @@ use focos_kernel::hal;
 #[cfg(not(target_arch = "riscv64"))]
 compile_error!("BOOT-001 currently supports only RISC-V; LoongArch is a future milestone");
 
-/// 接收固件启动参数，初始化并自检真实物理页，成功后报告启动完成并关机。
+/// 接收固件参数，验收真实页、中断状态和内核分页，持有基础页表至关机。
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
     // SAFETY: entry.S 只让启动 hart 进入，已关闭中断与分页，a1 保留固件的 DTB 地址。
@@ -32,6 +32,34 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
     unsafe { hal::check_local_irq_state() }
         .unwrap_or_else(|error| panic!("local IRQ state check failed: {error:?}"));
     hal::console_write("FOCOS_IRQ_OK\n");
+    let layout = focos_kernel::platform::kernel_layout(range);
+    hal::console_write_fmt(format_args!("FocOS VM layout: {layout:?}\n"));
+    let live = core::cell::Cell::new(0);
+    // SAFETY: MM-002 的唯一分配器管理独占 RAM；该范围在 Bare 和基础页表中恒等可访问。
+    let memory = unsafe { focos_kernel::mm::IdentityMemory::new(allocator) };
+    let mut memory = focos_kernel::mm::vm_check::ObservedMemory::new(memory, &live);
+    // SAFETY: 仅启动 hart，IRQ 状态自检已恢复 SIE=0，当前仍是 Bare。
+    let mut arch = unsafe { hal::init_vm_arch() }
+        .unwrap_or_else(|error| panic!("VM CPU initialization failed: {error:?}"));
+    // SAFETY: 布局来自实际链接符号；单核关中断，计数对应此唯一服务。
+    // 回调在基础页表建好后安装异常入口；最终空间及探针均持有至关机。
+    let (_address_space, _fault_probe) = unsafe {
+        focos_kernel::mm::vm_check::check_paging(
+            &mut memory,
+            &mut arch,
+            layout,
+            &live,
+            hal::probe_return_code(),
+            || hal::install_fault_probe(),
+            hal::console_write,
+        )
+    }
+    .unwrap_or_else(|error| panic!("paging self-test failed: {error:?}"));
+    hal::console_write_fmt(format_args!(
+        "FocOS VM retained table pages: {}\n",
+        live.get()
+    ));
+    hal::console_write("FOCOS_VM_OK\n");
     hal::console_write("FocOS: early S-mode boot\nFOCOS_BOOT_OK\n");
     hal::shutdown(false)
 }

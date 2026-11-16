@@ -2,9 +2,12 @@
 //!
 //! 具体寄存器与固件调用留在架构层；公共模块通过这里的稳定入口使用。
 
+pub use crate::arch::vm::*;
+
 #[cfg(target_arch = "riscv64")]
 pub use crate::arch::{
-    IrqCheckError, check_local_irq_state, local_irqs_enabled, with_local_irqs_disabled,
+    IrqCheckError, NativeFaultProbe, NativeVmArch, check_local_irq_state, init_vm_arch,
+    install_fault_probe, local_irqs_enabled, probe_return_code, with_local_irqs_disabled,
 };
 
 /// 按字节输出字符串，不申请堆内存。

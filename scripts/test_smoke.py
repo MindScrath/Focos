@@ -8,14 +8,30 @@ from unittest.mock import patch
 import smoke
 
 
-SUCCESS = "OpenSBI v1.3.1\nFOCOS_MM_OK\nFOCOS_IRQ_OK\nFOCOS_BOOT_OK\n"
+SUCCESS = """OpenSBI v1.3.1
+FOCOS_MM_OK
+FOCOS_IRQ_OK
+FOCOS_VM_ENABLED
+FOCOS_VM_ALIAS_OK
+FOCOS_VM_FAULT scause=0xf sepc=0x80201000 stval=0xffffffc000001000
+FOCOS_VM_READONLY_OK
+FOCOS_VM_FAULT scause=0xc sepc=0xffffffc000002000 stval=0xffffffc000002000
+FOCOS_VM_NOEXEC_OK
+FOCOS_VM_FAULT scause=0xd sepc=0x80202000 stval=0xffffffc000000000
+FOCOS_VM_UNMAP_OK
+FOCOS_VM_REMAP_OK
+FOCOS_VM_CLEAN_OK
+FOCOS_VM_LIFECYCLE_OK
+FOCOS_VM_OK
+FOCOS_BOOT_OK
+"""
 
 
 class ResultTests(unittest.TestCase):
     """验证各合同的成功标记、顺序和退出状态；固件版本不作为通过条件。"""
 
     def test_accepts_complete_results(self):
-        """启动、内存和中断合同都能从完整输出中取到自己的标记。"""
+        """启动、内存、中断和分页合同都能从完整输出中取到自己的标记。"""
         for contract in smoke.CONTRACTS:
             with self.subTest(contract=contract):
                 smoke.validate_result(SUCCESS, 0, contract)
@@ -24,7 +40,7 @@ class ResultTests(unittest.TestCase):
         """旧内核仍能通过启动检查，但不能通过新增专项检查。"""
         output = "OpenSBI v1.3.1\nFOCOS_BOOT_OK\n"
         smoke.validate_result(output, 0, "boot")
-        for contract in ("mm", "irq"):
+        for contract in ("mm", "irq", "vm"):
             with self.subTest(contract=contract):
                 with self.assertRaisesRegex(ValueError, "FOCOS_"):
                     smoke.validate_result(output, 0, contract)
@@ -43,7 +59,7 @@ class ResultTests(unittest.TestCase):
 
     def test_rejects_reversed_success_order(self):
         """专项自检尚未完成时不能提前报告启动成功。"""
-        for contract in ("mm", "irq"):
+        for contract in ("mm", "irq", "vm"):
             with self.subTest(contract=contract):
                 _, markers = smoke.CONTRACTS[contract]
                 reversed_output = (
@@ -73,6 +89,33 @@ class ResultTests(unittest.TestCase):
                     0,
                     "mm",
                 )
+
+    def test_vm_rejects_bad_fault_evidence(self):
+        """标记不能代替真实异常记录，错误原因、地址及重复异常均失败。"""
+        record = next(line for line in SUCCESS.splitlines()
+                      if line.startswith("FOCOS_VM_FAULT"))
+        for output in (
+                SUCCESS.replace(record + "\n", ""),
+                SUCCESS + record + "\n", SUCCESS.replace("scause=0xf", "scause=0x7"),
+                SUCCESS.replace("stval=0xffffffc000001000", "stval=0x0"),
+                SUCCESS.replace("sepc=0xffffffc000002000", "sepc=0x80201000"),
+                SUCCESS.replace(record + "\n", "") + record + "\n",
+                SUCCESS.replace("sepc=0x80201000", "sepc=0x0"),
+                SUCCESS + "FOCOS_VM_UNEXPECTED scause=0x2\n"):
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                smoke.validate_result(output, 0, "vm")
+
+    def test_old_kernel_cannot_pass_vm(self):
+        """MM-002 与 ARCH-001 已通过的旧内核仍缺少分页行为。"""
+        with self.assertRaisesRegex(ValueError, "FOCOS_VM"):
+            smoke.validate_result(
+                "FOCOS_MM_OK\nFOCOS_IRQ_OK\nFOCOS_BOOT_OK\n", 0, "vm",
+            )
+
+    def test_vm_exit_status_is_required(self):
+        """全部事件已输出也不能掩盖退出失败。"""
+        with self.assertRaisesRegex(ValueError, "status"):
+            smoke.validate_result(SUCCESS, 1, "vm")
 
 
 class RunnerTests(unittest.TestCase):
@@ -116,6 +159,17 @@ class RunnerTests(unittest.TestCase):
                 "PASS: MM-002 (QEMU emulator version 9.0.0); "
                 f"log: {smoke.MM_LOG}"
             )
+
+    def test_vm_timeout_after_success_fails(self):
+        """分页成功标记之后的超时仍记录失败。"""
+        error = subprocess.TimeoutExpired("qemu", 20, output=SUCCESS.encode())
+        with patch.object(smoke.subprocess, "check_output", return_value="QEMU 8.2.2\n"), \
+                patch.object(smoke.subprocess, "run", side_effect=error), \
+                patch.object(smoke, "write_log") as write_log:
+            with self.assertRaisesRegex(SystemExit, "timed out"):
+                smoke.run_check("vm")
+            self.assertEqual(write_log.call_args.args[0], smoke.VM_LOG)
+            self.assertEqual(write_log.call_args.args[-1], "TIMEOUT")
 
     def test_irq_contract_uses_its_own_log(self):
         """中断专项通过时报告 ARCH-001，并写入独立日志路径。"""

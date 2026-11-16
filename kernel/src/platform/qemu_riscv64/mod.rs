@@ -4,4 +4,4 @@ mod memory;
 
 pub use memory::MemoryInitError;
 #[cfg(focos_platform = "qemu_riscv64")]
-pub use memory::boot_page_allocator;
+pub use memory::{boot_page_allocator, kernel_layout};

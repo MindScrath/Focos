@@ -4,15 +4,20 @@ ENTRY(_start)
 
 SECTIONS {
     . = 0x80200000;
+    __code_start = .;
     .text : { KEEP(*(.text.entry)) *(.text .text.*) }
     . = ALIGN(4096);
+    __code_end = .;
+    __rodata_start = .;
     .rodata : { *(.rodata .rodata.*) *(.srodata .srodata.*) }
     . = ALIGN(4096);
+    __rodata_end = .;
+    __writable_start = .;
     .data : { *(.data .data.*) *(.sdata .sdata.*) }
     . = ALIGN(4096);
     __bss_start = .;
     .bss (NOLOAD) : { *(.bss .bss.*) *(.sbss .sbss.*) *(COMMON) }
-    . = ALIGN(8);
+    . = ALIGN(4096);
     __bss_end = .;
     /* 包含启动栈和页分配标记，物理页分配从此地址向上对齐后开始。 */
     __kernel_end = .;

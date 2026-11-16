@@ -38,6 +38,10 @@
 - [RISC-V 特权规范 20240411：Supervisor](https://docs.riscv.org/reference/isa/v20240411/priv/supervisor.html)：MM-003 的 Sv39、分页切换、地址转换缓存同步及异常语义依据。
 - [OpenSBI v1.3.1](https://github.com/riscv-software-src/opensbi/tree/v1.3.1)：核对已有 QEMU 环境中的异常转交；具体源码及借鉴范围见 [MM-003 参考页](reference/sv39-paging.md#规范依据)。
 
+- [Rust 内联汇编参考](https://doc.rust-lang.org/reference/inline-assembly.html)：核对寄存器和编译器访存约束；`satp`、`sfence.vma`、`fence.i` 汇编不使用 `nomem`。
+- [Rust 未定义行为参考](https://doc.rust-lang.org/reference/behavior-considered-undefined.html)：核对页访问闭包的有效存储、对齐、引用独占及有效期前提，用于补全 MM-003 的安全注释。
+- [Rust MaybeUninit](https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#method.as_mut_ptr)：核对先写入初始化、再形成字节引用的顺序，避免依赖空闲 RAM 已初始化。
+
 以上资料用于 MM-003 的设计约定，未引入外部实现代码。运行证据由实现 PR 提供。
 
 ## 多平台设计参考

@@ -36,6 +36,8 @@ make check
 
 [ARCH-001 本核临界区](reference/local-irq-critical-section.md) 的 QEMU 状态自检另跑 `make irq-smoke`，通过时显示 `PASS: ARCH-001`。它核对单层/两层闭包和初态开/关，日志在 `target/evidence/irq-qemu-rv.log`；真实定时中断屏蔽仍待 #2/#5 联调，不因本项通过而关闭 #35。
 
+[MM-003 内核分页](reference/sv39-paging.md) 另跑 `make vm-smoke`，通过时显示 `PASS: MM-003`。它实际启用分页并检查写读、保护异常、撤销、重映射与销毁；原始异常寄存器、根页表和资源数在 `target/evidence/vm-qemu-rv.log`。结果仅覆盖本次 QEMU 环境，不代表用户态隔离或真板分页。
+
 | 遇到问题 | 先检查 |
 | --- | --- |
 | 找不到 QEMU | `qemu-system-riscv64 --version` |
@@ -69,6 +71,7 @@ make build
 make check
 make mm-smoke
 make irq-smoke
+make vm-smoke
 ```
 
 完整 QEMU 命令以 [scripts/smoke.py](../scripts/smoke.py) 为准，日志也记录实际命令。布局、页读写、中断状态及成功标记通过只证明当前启动自检，不代表用户程序或文件系统已运行。

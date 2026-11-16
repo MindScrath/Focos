@@ -87,3 +87,28 @@ pub unsafe fn boot_page_allocator(
 
 #[cfg(test)]
 mod tests;
+
+/// 用实际链接边界构造分页布局，不把镜像末尾写死在运行代码中。
+#[cfg(focos_platform = "qemu_riscv64")]
+pub fn kernel_layout(allocatable: Range<usize>) -> crate::mm::KernelLayout {
+    use crate::mm::{KernelLayout, PhysAddr, VirtAddr};
+    unsafe extern "C" {
+        static __code_start: u8;
+        static __code_end: u8;
+        static __rodata_start: u8;
+        static __rodata_end: u8;
+        static __writable_start: u8;
+        static __kernel_end: u8;
+    }
+    KernelLayout {
+        code: PhysAddr::from_raw((&raw const __code_start).addr())
+            ..PhysAddr::from_raw((&raw const __code_end).addr()),
+        rodata: PhysAddr::from_raw((&raw const __rodata_start).addr())
+            ..PhysAddr::from_raw((&raw const __rodata_end).addr()),
+        writable: PhysAddr::from_raw((&raw const __writable_start).addr())
+            ..PhysAddr::from_raw((&raw const __kernel_end).addr()),
+        allocatable: PhysAddr::from_raw(allocatable.start)..PhysAddr::from_raw(allocatable.end),
+        test_window: VirtAddr::from_raw(0xffff_ffc0_0000_0000)
+            ..VirtAddr::from_raw(0xffff_ffc0_0000_4000),
+    }
+}

@@ -20,11 +20,11 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 共享块接口检查按 [TEST-002](specs/TEST-002.md) 接收独立镜像模型，复用已知数据、边界、写后读和同步判据。当前仅完成 host 接入；有限读回观察不替代真实驱动、DMA 安全或重启持久化验收。
 
-本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，并按 [MM-002](specs/MM-002.md) 接入 QEMU 真实内存，完成整页写入、读回、释放和再次分配。运行 `make test` 验证开发机行为，`make mm-smoke` 验证 QEMU 内存自检。页表、用户映射与真板内存接入尚未实现，本阶段仍待队友审阅与验收。
+本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，并按 [MM-002](specs/MM-002.md) 接入 QEMU 真实内存，完成整页写入、读回、释放和再次分配。运行 `make test` 验证开发机行为，`make mm-smoke` 验证 QEMU 内存自检。用户映射与真板内存接入尚未实现，本阶段仍待队友审阅与验收。
 
 本分支新增可嵌套的本核临界区 `with_local_irqs_disabled`：保存并恢复 RISC-V `sstatus.SIE`，闭包只执行一次并透传返回值。单层/两层与初态开/关由 `make irq-smoke` 的 QEMU 状态自检核对；自检入口为仅限启动期的 `unsafe` 接口，`make test` 编译调用方验证此边界。编译器屏障的静态审阅和负例见[参考页](docs/reference/local-irq-critical-section.md)。真实定时中断屏蔽仍待 #2/#5 的时钟与异常入口联调。
 
-内核分页的下一阶段约定见 [MM-003 草案](specs/MM-003.md)，页表、映射和异常验收细节见[参考页](docs/reference/sv39-paging.md)。内核分页与 `make vm-smoke` 均待实现。
+本分支按 [MM-003](specs/MM-003.md) 实现 QEMU 内核 Sv39 分页，新增 `make vm-smoke` 验证非恒等地址写读、只读与不可执行保护、撤销、重映射及页表回收。接口与验收约定见[参考页](docs/reference/sv39-paging.md)，运行方法见[上手指南](docs/getting-started.md)。实现待人工审阅；用户态隔离与真板分页另行验收。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
@@ -64,27 +64,42 @@ Focos/
 │       │   ├── contract.rs            # 独立镜像模型、共享检查与转发故障注入
 │       │   └── contract/              # 共享检查的 host 验证
 │       │       └── tests.rs           # 内存盘适配与非合规设备负例
-│       ├── mm.rs                      # 物理页分配、回收与错误类型
-│       ├── mm/                        # 页分配测试与真实页读写自检
+│       ├── mm.rs                      # 页分配器与公共分页接口入口
+│       ├── mm/                        # 物理页、地址空间与启动验收
 │       │   ├── tests.rs               # 分配、回收、耗尽与非法输入测试
 │       │   ├── boot_check.rs          # 启动时整页写读、释放后再分配与测试页清理
-│       │   └── boot_check/            # 启动页读写检查的开发机验证
-│       │       └── tests.rs           # 页内容、回收与读回错误测试
-│       ├── hal.rs                     # 内核使用的控制台、关机、本核中断与自检接口
+│       │   ├── boot_check/            # 启动页读写检查的开发机验证
+│       │   │   └── tests.rs           # 页内容、回收与读回错误测试
+│       │   ├── vm.rs                  # 地址、权限、布局与页资源契约
+│       │   ├── vm/                    # 公共页表资源与生命周期
+│       │   │   ├── memory.rs          # 复用页分配器的恒等访问适配
+│       │   │   ├── space.rs           # 基础映射、窗口、回滚与显式销毁
+│       │   │   └── tests.rs           # 对齐缓冲区、故障注入与所有权测试
+│       │   └── vm_check.rs            # 实际虚拟访问、保护探针和生命周期验收
+│       ├── hal.rs                     # 控制台、中断、分页与同步异常能力入口
 │       ├── platform/                  # 板级资源、加载布局与启动装配
 │       │   ├── mod.rs                 # 统一导出当前板型接口
 │       │   └── qemu_riscv64/          # QEMU virt 固定配置
 │       │       ├── mod.rs             # 组织 QEMU 板级实现
 │       │       ├── linker.ld          # QEMU 内核加载地址和段布局
-│       │       ├── memory.rs          # 布局校验、静态标记与启动页分配
+│       │       ├── memory.rs          # 布局校验、启动页分配与分页布局
 │       │       └── memory/            # 板级内存布局测试
 │       │           └── tests.rs       # 保留区、地址边界与标记容量测试
 │       └── arch/                      # 与 CPU 架构相关的实现
 │           ├── mod.rs                 # 选择目标架构并导出接口
-│           └── riscv64/               # RISC-V 启动、SBI 与中断开关
+│           ├── vm.rs                  # 页表操作与单次异常探针契约
+│           └── riscv64/               # RISC-V 启动、分页、异常与中断开关
 │               ├── entry.S            # 设置栈、清理 BSS 并进入 Rust
 │               ├── irq.rs             # 保存/关闭/恢复 sstatus.SIE 与编译器屏障
 │               ├── irq_check.rs       # QEMU 单层/嵌套中断状态自检
+│               ├── paging.rs          # Sv39 编码、遍历与发布顺序
+│               ├── paging/            # 实际页表字节的独立验证
+│               │   └── tests.rs       # 权限、页号、非法项及 CPU/资源失败注入
+│               ├── vm_cpu.rs          # satp 读写、状态校验与本核同步
+│               ├── fault.S            # 寄存器保存、异常返回与探针标签
+│               ├── fault.rs           # 单次异常匹配器及注入测试
+│               ├── fault/             # 真实异常入口装配
+│               │   └── native.rs      # stvec、固定记录、探针执行与返回代码
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
 │   ├── ARCH-001.md                    # CPU 机制与架构 ABI 边界（本核临界区已实现，待审阅）
@@ -100,9 +115,10 @@ Focos/
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
-│   ├── smoke.py                       # 检查 QEMU 启动、真实页读写与中断状态
+│   ├── smoke.py                       # 检查启动、物理页、中断状态与分页专项
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
 │   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
+│   ├── test_vm_api.py                 # 编译调用方，验证分页借用与 unsafe 边界
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
