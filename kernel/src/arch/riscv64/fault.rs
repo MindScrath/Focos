@@ -100,7 +100,8 @@ pub use native::{NativeFaultProbe, install_fault_probe, probe_return_code};
 mod tests {
     use super::*;
     fn request() -> (ProbeOp, ExpectedFault) {
-        let address = VirtAddr::from_raw(0xffffffc000001000);
+        // 匹配器只比较地址，使用 32 位和 64 位开发机都能完整表示的值。
+        let address = VirtAddr::from_raw(0x9000_1000);
         let site = ProbeSite {
             instruction: VirtAddr::from_raw(0x80200002),
             resume: VirtAddr::from_raw(0x80200006),

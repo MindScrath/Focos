@@ -1,10 +1,10 @@
 //! 使用真实 Sv39 后端与有效对齐缓冲区验证公共内存接口。
+//! Sv39 地址与 CPU 模型需要 64 位开发机；资源服务用例在两种位宽上均执行。
 extern crate std;
 use super::*;
-use crate::{
-    arch::riscv64::paging::{Sv39, VmCpu},
-    mm::PageAllocator,
-};
+#[cfg(target_pointer_width = "64")]
+use crate::arch::riscv64::paging::{Sv39, VmCpu};
+use crate::mm::PageAllocator;
 use core::cell::{Cell, RefCell};
 use std::{boxed::Box, rc::Rc, vec::Vec};
 
@@ -111,6 +111,7 @@ impl<'a> HostMemory<'a> {
             end,
         }
     }
+    #[cfg(target_pointer_width = "64")]
     pub fn layout(&self) -> KernelLayout {
         KernelLayout {
             code: PhysAddr(0x800000)..PhysAddr(0x801000),
@@ -156,12 +157,14 @@ unsafe impl VmMemory for HostMemory<'_> {
         Ok(())
     }
 }
+#[cfg(target_pointer_width = "64")]
 pub(crate) struct Cpu {
     pub satp: usize,
     pub reject: bool,
     pub stats: Rc<Stats>,
 }
 // SAFETY: 只用于 host 数值模型；写入、读回和同步事件均由测试观察，不执行裸机指令。
+#[cfg(target_pointer_width = "64")]
 unsafe impl VmCpu for Cpu {
     fn read_satp(&self) -> usize {
         self.satp
@@ -179,6 +182,7 @@ unsafe impl VmCpu for Cpu {
         self.stats.events.borrow_mut().push("sync");
     }
 }
+#[cfg(target_pointer_width = "64")]
 pub(crate) fn backend(stats: Rc<Stats>) -> Sv39<Cpu> {
     Sv39 {
         cpu: Cpu {
@@ -190,12 +194,14 @@ pub(crate) fn backend(stats: Rc<Stats>) -> Sv39<Cpu> {
 }
 
 /// 注入切换后读回失败；不访问真实 CPU，状态由测试独立观察。
+#[cfg(target_pointer_width = "64")]
 struct UncertainCpu {
     satp: Rc<Cell<usize>>,
     reads: Rc<Cell<usize>>,
     uncertain_read: Rc<Cell<Option<usize>>>,
 }
 // SAFETY: host 状态模型准确返回注入的硬件观测值；切换不影响开发机的地址翻译。
+#[cfg(target_pointer_width = "64")]
 unsafe impl VmCpu for UncertainCpu {
     fn read_satp(&self) -> usize {
         let count = self.reads.get() + 1;
@@ -216,6 +222,7 @@ unsafe impl VmCpu for UncertainCpu {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn uncertain_post_switch_state_is_fatal_and_keeps_table_pages_owned() {
     use std::panic::{AssertUnwindSafe, catch_unwind};
     for deactivate in [false, true] {
@@ -280,6 +287,7 @@ fn uncertain_post_switch_state_is_fatal_and_keeps_table_pages_owned() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn creates_base_mappings_before_activation() {
     let mut flags = [false; 32];
     let mut memory = HostMemory::new(&mut flags);
@@ -313,12 +321,14 @@ fn creates_base_mappings_before_activation() {
 }
 
 /// 测试调用点已停止所有别名访问，资源归还必须成功。
+#[cfg(target_pointer_width = "64")]
 fn release(memory: &mut HostMemory<'_>, page: HostPage) {
     // SAFETY: 每个用例先销毁空间或撤销所有窗口，且不保留缓冲区引用。
     unsafe { memory.release_page(page) }.unwrap_or_else(|(error, _)| panic!("release: {error:?}"));
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn invalid_layouts_allocate_nothing() {
     let mut flags = [false; 32];
     let mut memory = HostMemory::new(&mut flags);
@@ -352,6 +362,7 @@ fn invalid_layouts_allocate_nothing() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn new_rolls_back_every_allocation_point_with_data_still_owned() {
     let mut flags = [false; 600];
     let mut memory = HostMemory::new(&mut flags);
@@ -379,6 +390,7 @@ fn new_rolls_back_every_allocation_point_with_data_still_owned() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn map_rolls_back_each_new_table_and_preserves_existing_mapping() {
     let mut flags = [false; 32];
     let mut memory = HostMemory::new(&mut flags);
@@ -441,6 +453,7 @@ fn map_rolls_back_each_new_table_and_preserves_existing_mapping() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn page_tables_do_not_borrow_whole_pages() {
     let mut flags = [false; 32];
     let mut memory = HostMemory::new(&mut flags);
@@ -465,6 +478,7 @@ fn page_tables_do_not_borrow_whole_pages() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn indexes_cross_two_mebibytes_and_one_gibibyte_without_aliasing() {
     for boundary in [0x200000, 0x40000000] {
         let mut flags = [false; 32];
@@ -506,6 +520,7 @@ fn indexes_cross_two_mebibytes_and_one_gibibyte_without_aliasing() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn errors_follow_public_priority_and_never_replace_mapping() {
     let mut flags = [false; 32];
     let mut memory = HostMemory::new(&mut flags);
@@ -651,6 +666,7 @@ fn errors_follow_public_priority_and_never_replace_mapping() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn lifecycle_syncs_before_reclaim_and_preserves_data_ownership() {
     let mut flags = [false; 32];
     let mut memory = HostMemory::new(&mut flags);
@@ -719,6 +735,7 @@ fn lifecycle_syncs_before_reclaim_and_preserves_data_ownership() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn unsupported_cpu_restores_bare_and_other_roots_are_not_overwritten() {
     use crate::hal::VmArch;
     let stats = Rc::new(Stats::default());
@@ -772,6 +789,7 @@ fn resource_rejection_keeps_handle_and_content_and_service_drop_keeps_page() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn active_allocation_rollback_syncs_before_free_and_one_new_table_can_fail() {
     let mut flags = [false; 32];
     let mut memory = HostMemory::new(&mut flags);
@@ -813,6 +831,7 @@ fn active_allocation_rollback_syncs_before_free_and_one_new_table_can_fail() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn occupied_valid_range_is_exhaustion_not_invalid_layout() {
     let mut flags = [false; 1];
     let mut memory = HostMemory::new(&mut flags);
@@ -828,6 +847,7 @@ fn occupied_valid_range_is_exhaustion_not_invalid_layout() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn fixed_table_metadata_exhaustion_rolls_back_without_losing_old_entries() {
     let mut flags = [false; 256];
     let mut memory = HostMemory::new(&mut flags);

@@ -38,6 +38,8 @@ make check
 
 [MM-003 内核分页](reference/sv39-paging.md) 另跑 `make vm-smoke`，通过时显示 `PASS: MM-003`。它实际启用分页并检查写读、保护异常、撤销、重映射与销毁；原始异常寄存器、根页表和资源数在 `target/evidence/vm-qemu-rv.log`。结果仅覆盖本次 QEMU 环境，不代表用户态隔离或真板分页。
 
+Sv39 开发机数值模型需要 64 位地址，相关 Rust 用例只在 64 位开发机运行；32 位开发机保留分配器、内存盘、异常匹配和资源交接等通用用例。完整 MM-003 验收仍须运行 64 位开发机测试与 `make vm-smoke`。
+
 | 遇到问题 | 先检查 |
 | --- | --- |
 | 找不到 QEMU | `qemu-system-riscv64 --version` |

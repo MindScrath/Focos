@@ -13,18 +13,20 @@ impl PageCount {
     }
 }
 /// 仅供启动验收观察成功申请与归还，不扩充生产 VmMemory 接口。
-pub struct ObservedMemory<'a, M> {
-    inner: M,
-    live: &'a PageCount,
+pub struct ObservedMemory<'memory, 'count, M> {
+    inner: &'memory mut M,
+    live: &'count PageCount,
 }
 /// 已计数的页；私有字段阻止把包装前的底层句柄当成已计数页归还。
 pub struct ObservedPage<'a, P> {
     inner: P,
     live: &'a PageCount,
 }
-impl<'a, M> ObservedMemory<'a, M> {
-    /// 接管服务，不重置已有计数；此后只接收同一计数来源的包装页。
-    pub fn new(inner: M, live: &'a PageCount) -> Self {
+impl<'memory, 'count, M> ObservedMemory<'memory, 'count, M> {
+    /// 临时独占借用服务，不重置计数；只接收同一计数来源的包装页。
+    /// 借用结束后，包装前申请的底层页仍可交回原服务。
+    /// 包装页不借用服务；可在下次使用同一服务和计数器时归还。
+    pub fn new(inner: &'memory mut M, live: &'count PageCount) -> Self {
         Self { inner, live }
     }
 }
@@ -46,9 +48,10 @@ unsafe impl<P: VmPage> VmPage for ObservedPage<'_, P> {
         self.inner.write_word(slot, value);
     }
 }
-// SAFETY: 包装页保留来源与所有权；预先检查计数，底层失败时重建原句柄且不改计数。
-unsafe impl<'a, M: VmMemory> VmMemory for ObservedMemory<'a, M> {
-    type Page = ObservedPage<'a, M::Page>;
+// SAFETY: 独占借用底层服务，包装页不借用服务且保留来源与所有权；
+// 预先检查计数，底层失败时重建原句柄且不改计数。
+unsafe impl<'count, M: VmMemory> VmMemory for ObservedMemory<'_, 'count, M> {
+    type Page = ObservedPage<'count, M::Page>;
     fn managed_range(&self) -> Range<PhysAddr> {
         self.inner.managed_range()
     }
@@ -386,15 +389,66 @@ mod tests {
     use crate::mm::vm::tests::HostMemory;
 
     #[test]
+    fn original_pages_can_be_returned_after_observation() {
+        let mut flags = [false; 2];
+        let mut memory = HostMemory::new(&mut flags);
+        let mut original = memory.alloc_zeroed_page().unwrap();
+        original.with_bytes_mut(|bytes| bytes.fill(0x57));
+        let stats = memory.stats.clone();
+        let live = PageCount::default();
+        {
+            let mut observed = ObservedMemory::new(&mut memory, &live);
+            let counted = observed.alloc_zeroed_page().unwrap();
+            assert_eq!(stats.live.get(), 2);
+            assert_eq!(live.get(), 1);
+            // SAFETY: 测试页没有映射或遗留引用，交回持有它的服务。
+            assert!(unsafe { observed.release_page(counted) }.is_ok());
+        }
+        assert_eq!(live.get(), 0);
+        assert_eq!(stats.live.get(), 1);
+        original.with_bytes(|bytes| assert!(bytes.iter().all(|byte| *byte == 0x57)));
+        // SAFETY: 原页没有映射或遗留引用，观察结束后仍交回原服务。
+        assert!(unsafe { memory.release_page(original) }.is_ok());
+        assert_eq!(stats.live.get(), 0);
+        let reused = memory.alloc_zeroed_page().unwrap();
+        reused.with_bytes(|bytes| assert!(bytes.iter().all(|byte| *byte == 0)));
+        // SAFETY: 重新申请的独占页未建立映射或遗留引用。
+        assert!(unsafe { memory.release_page(reused) }.is_ok());
+        assert_eq!(stats.live.get(), 0);
+    }
+
+    #[test]
+    fn counted_page_survives_the_observer_borrow() {
+        let mut flags = [false; 1];
+        let mut memory = HostMemory::new(&mut flags);
+        let live = PageCount::default();
+        let mut page = {
+            let mut observed = ObservedMemory::new(&mut memory, &live);
+            observed.alloc_zeroed_page().unwrap()
+        };
+        assert_eq!(live.get(), 1);
+        assert_eq!(memory.stats.live.get(), 1);
+        page.with_bytes_mut(|bytes| bytes.fill(0x31));
+        let mut observed = ObservedMemory::new(&mut memory, &live);
+        page.with_bytes(|bytes| assert!(bytes.iter().all(|byte| *byte == 0x31)));
+        // SAFETY: 同一底层服务和计数器，页未映射，也没有遗留引用。
+        assert!(unsafe { observed.release_page(page) }.is_ok());
+        assert_eq!(live.get(), 0);
+        assert_eq!(memory.stats.live.get(), 0);
+    }
+
+    #[test]
     fn observer_rejection_preserves_page_content_and_counts() {
         for share_count in [false, true] {
             let mut flags = [false; 2];
             let mut other_flags = [false; 2];
             let live = PageCount::default();
             let other_live = PageCount::default();
-            let mut owner = ObservedMemory::new(HostMemory::new(&mut flags), &live);
+            let mut owner_memory = HostMemory::new(&mut flags);
+            let mut other_memory = HostMemory::new(&mut other_flags);
+            let mut owner = ObservedMemory::new(&mut owner_memory, &live);
             let mut other = ObservedMemory::new(
-                HostMemory::new(&mut other_flags),
+                &mut other_memory,
                 if share_count { &live } else { &other_live },
             );
             let mut page = owner.alloc_zeroed_page().unwrap();
@@ -415,9 +469,9 @@ mod tests {
     fn count_failure_is_detected_before_releasing_the_page() {
         let mut flags = [false; 2];
         let live = PageCount::default();
-        let inner = HostMemory::new(&mut flags);
+        let mut inner = HostMemory::new(&mut flags);
         let stats = inner.stats.clone();
-        let mut memory = ObservedMemory::new(inner, &live);
+        let mut memory = ObservedMemory::new(&mut inner, &live);
         let page = memory.alloc_zeroed_page().unwrap();
         live.0.set(0); // 模拟封装内部计数损坏，公共调用者不能修改该字段。
         // SAFETY: 页未映射，无遗留引用；失败不能先归还底层资源。
@@ -441,9 +495,11 @@ mod tests {
         let mut first_flags = [false; 2];
         let mut second_flags = [false; 2];
         let live = PageCount::default();
-        let mut first = ObservedMemory::new(HostMemory::new(&mut first_flags), &live);
+        let mut first_memory = HostMemory::new(&mut first_flags);
+        let mut second_memory = HostMemory::new(&mut second_flags);
+        let mut first = ObservedMemory::new(&mut first_memory, &live);
         let page = first.alloc_zeroed_page().unwrap();
-        let _second = ObservedMemory::new(HostMemory::new(&mut second_flags), &live);
+        let _second = ObservedMemory::new(&mut second_memory, &live);
         assert_eq!(live.get(), 1);
         // SAFETY: 独占测试页从未建立映射，也没有遗留引用。
         assert!(unsafe { first.release_page(page) }.is_ok());

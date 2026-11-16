@@ -1,6 +1,8 @@
 //! RISC-V 的启动、分页、同步异常、SBI 调用与本核中断开关。
 
 mod fault;
+// Sv39 数值模型包含 RV64 寄存器和地址；32 位开发机仍运行异常匹配等通用测试。
+#[cfg(target_pointer_width = "64")]
 pub(crate) mod paging;
 #[cfg(target_arch = "riscv64")]
 pub use fault::{NativeFaultProbe, install_fault_probe, probe_return_code};

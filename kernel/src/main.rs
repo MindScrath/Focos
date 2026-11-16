@@ -36,8 +36,8 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
     hal::console_write_fmt(format_args!("FocOS VM layout: {layout:?}\n"));
     let live = focos_kernel::mm::vm_check::PageCount::default();
     // SAFETY: MM-002 的唯一分配器管理独占 RAM；该范围在 Bare 和基础页表中恒等可访问。
-    let memory = unsafe { focos_kernel::mm::IdentityMemory::new(allocator) };
-    let mut memory = focos_kernel::mm::vm_check::ObservedMemory::new(memory, &live);
+    let mut physical_memory = unsafe { focos_kernel::mm::IdentityMemory::new(allocator) };
+    let mut memory = focos_kernel::mm::vm_check::ObservedMemory::new(&mut physical_memory, &live);
     // SAFETY: 仅启动 hart，IRQ 状态自检已恢复 SIE=0，当前仍是 Bare。
     let mut arch = unsafe { hal::init_vm_arch() }
         .unwrap_or_else(|error| panic!("VM CPU initialization failed: {error:?}"));

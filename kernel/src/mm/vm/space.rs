@@ -155,12 +155,14 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
     ///
     /// # Safety
     /// 唯一启动核、关中断且已装异常入口；代码、栈、表页及返回路径跨切换有效。
+    /// 只读数据、异常入口及记录、日志和失败处理所需内存均按所需权限可访问。
     pub unsafe fn activate(&mut self) -> Result<(), VmError> {
         self.live()?;
         if self.state == State::Active || self.arch.current_root()?.is_some() {
             return Err(VmError::InvalidState);
         }
-        // SAFETY: 调用者满足切换前提，基础布局已经完整建立。
+        // SAFETY: 基础布局已完整建立，本对象持有根及全部下级表页，停用并同步前不回收。
+        // 调用者保证执行、异常和日志路径在切换前后有效。
         unsafe {
             self.arch.activate(self.root)?;
         }
@@ -175,7 +177,8 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
     /// 停用并读回确认后才能销毁。
     ///
     /// # Safety
-    /// 同 activate；无窗口引用或执行，恒等代码和栈在无分页时有效。
+    /// 唯一启动核、关中断，无窗口引用或执行；代码、栈、返回路径、只读数据、
+    /// 已安装的异常入口及记录、日志和失败处理所需内存在无分页时仍有效。
     pub unsafe fn deactivate(&mut self) -> Result<(), VmError> {
         self.live()?;
         if self.state != State::Active || self.arch.current_root()? != Some(self.root) {
