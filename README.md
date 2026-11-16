@@ -110,7 +110,7 @@ Focos/
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
-│       ├── sv39-paging.md              # 页表接口、启动映射与分页验收细节
+│       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
