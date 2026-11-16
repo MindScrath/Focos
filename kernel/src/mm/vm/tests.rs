@@ -14,43 +14,84 @@ pub(crate) struct Stats {
     pub calls: Cell<usize>,
     pub budget: Cell<Option<usize>>,
     pub events: RefCell<Vec<&'static str>>,
+    pub byte_borrows: Cell<usize>,
+    pub writes: RefCell<Vec<(usize, usize, u64)>>,
 }
 #[repr(C, align(4096))]
-pub(crate) struct Buffer(pub [u8; 4096]);
+pub(crate) struct Buffer(pub [u8; PAGE_SIZE]);
 pub(crate) struct HostPage {
     pub pa: PhysAddr,
     pub bytes: Box<Buffer>,
     pub owner: Rc<Stats>,
+}
+impl HostPage {
+    fn record_write(&self, slot: usize, value: u64) {
+        self.owner
+            .writes
+            .borrow_mut()
+            .push((self.pa.0, slot, value));
+        self.owner.events.borrow_mut().push(if value == 0 {
+            "clear"
+        } else if value & 0x3ff == 1 {
+            "publish"
+        } else {
+            "leaf"
+        });
+    }
 }
 // SAFETY: Box 独占完整对齐缓冲区，不借用服务；数字 PA 不转换为指针。
 unsafe impl VmPage for HostPage {
     fn phys_addr(&self) -> PhysAddr {
         self.pa
     }
-    fn with_bytes<R>(&self, f: impl FnOnce(&[u8; 4096]) -> R) -> R {
+    fn with_bytes<R>(&self, f: impl FnOnce(&[u8; PAGE_SIZE]) -> R) -> R {
+        self.owner
+            .byte_borrows
+            .set(self.owner.byte_borrows.get() + 1);
         f(&self.bytes.0)
     }
-    fn with_bytes_mut<R>(&mut self, f: impl FnOnce(&mut [u8; 4096]) -> R) -> R {
+    fn with_bytes_mut<R>(&mut self, f: impl FnOnce(&mut [u8; PAGE_SIZE]) -> R) -> R {
+        self.owner
+            .byte_borrows
+            .set(self.owner.byte_borrows.get() + 1);
         let before = self.bytes.0;
         let result = f(&mut self.bytes.0);
-        for (old, new) in before
+        for (slot, (old, new)) in before
             .as_chunks::<8>()
             .0
             .iter()
             .zip(self.bytes.0.as_chunks::<8>().0)
+            .enumerate()
         {
             if old != new {
                 let value = u64::from_le_bytes(*new);
-                self.owner.events.borrow_mut().push(if value == 0 {
-                    "clear"
-                } else if value & 0x3ff == 1 {
-                    "publish"
-                } else {
-                    "leaf"
-                });
+                self.record_write(slot, value);
             }
         }
         result
+    }
+    fn read_word(&self, slot: usize) -> u64 {
+        assert!(slot < PAGE_SIZE / size_of::<u64>());
+        // SAFETY: Box 持有已初始化的对齐缓冲区，索引在页内；只使用裸指针。
+        unsafe {
+            (&raw const self.bytes.0)
+                .cast::<u64>()
+                .add(slot)
+                .read_volatile()
+        }
+    }
+    fn write_word(&mut self, slot: usize, value: u64) {
+        let old = self.read_word(slot);
+        // SAFETY: read_word 已检查边界，当前独占句柄；测试缓冲区不交给硬件。
+        unsafe {
+            (&raw mut self.bytes.0)
+                .cast::<u64>()
+                .add(slot)
+                .write_volatile(value);
+        }
+        if old != value {
+            self.record_write(slot, value);
+        }
     }
 }
 pub(crate) struct HostMemory<'a> {
@@ -62,7 +103,7 @@ pub(crate) struct HostMemory<'a> {
 impl<'a> HostMemory<'a> {
     pub fn new(flags: &'a mut [bool]) -> Self {
         let start = 0x803000;
-        let end = start + flags.len() * 4096;
+        let end = start + flags.len() * PAGE_SIZE;
         Self {
             allocator: PageAllocator::new(start, end, flags).unwrap(),
             stats: Rc::default(),
@@ -99,7 +140,7 @@ unsafe impl VmMemory for HostMemory<'_> {
         self.stats.events.borrow_mut().push("alloc");
         Ok(HostPage {
             pa,
-            bytes: Box::new(Buffer([0; 4096])),
+            bytes: Box::new(Buffer([0; PAGE_SIZE])),
             owner: self.stats.clone(),
         })
     }
@@ -252,8 +293,8 @@ fn creates_base_mappings_before_activation() {
         (layout.writable, MapPerm::RW),
         (layout.allocatable, MapPerm::RW),
     ] {
-        for base in (range.start.0..range.end.0).step_by(4096) {
-            for offset in [0, 37, 4095] {
+        for base in (range.start.0..range.end.0).step_by(PAGE_SIZE) {
+            for offset in [0, 37, (PAGE_SIZE - 1)] {
                 assert_eq!(
                     space.query(VirtAddr(base + offset)),
                     Ok(Some(Translation {
@@ -287,15 +328,15 @@ fn invalid_layouts_allocate_nothing() {
         match case {
             0 => layout.code.end = layout.code.start,
             1 => layout.code.start = PhysAddr(layout.code.start.0 + 1),
-            2 => layout.rodata.end = PhysAddr(layout.rodata.start.0 - 4096),
+            2 => layout.rodata.end = PhysAddr(layout.rodata.start.0 - PAGE_SIZE),
             3 => layout.rodata.start = layout.code.start,
-            4 => layout.allocatable.end = PhysAddr(layout.allocatable.end.0 + 4096),
-            5 => layout.allocatable.end = PhysAddr(layout.allocatable.end.0 - 4096),
+            4 => layout.allocatable.end = PhysAddr(layout.allocatable.end.0 + PAGE_SIZE),
+            5 => layout.allocatable.end = PhysAddr(layout.allocatable.end.0 - PAGE_SIZE),
             6 => layout.test_window = VirtAddr(0x800000)..VirtAddr(0x801000),
             7 => layout.test_window = VirtAddr(0)..VirtAddr(0xffffffc000000000),
-            8 => layout.test_window = VirtAddr(1usize << 38)..VirtAddr((1usize << 38) + 4096),
+            8 => layout.test_window = VirtAddr(1usize << 38)..VirtAddr((1usize << 38) + PAGE_SIZE),
             9 => layout.test_window.end = VirtAddr(usize::MAX),
-            _ => layout.writable.start = PhysAddr(usize::MAX - 4095),
+            _ => layout.writable.start = PhysAddr(usize::MAX - (PAGE_SIZE - 1)),
         }
         let mut arch = backend(memory.stats.clone());
         assert!(
@@ -366,16 +407,24 @@ fn map_rolls_back_each_new_table_and_preserves_existing_mapping() {
     // SAFETY: 本用例只访问数值映射，页面句柄保持有效。
     unsafe {
         stats.events.borrow_mut().clear();
+        stats.writes.borrow_mut().clear();
         space.map_page(va, data.pa, MapPerm::RW).unwrap();
         assert_eq!(
             *stats.events.borrow(),
             ["alloc", "alloc", "leaf", "publish", "publish"]
         );
+        let writes = stats.writes.borrow();
+        assert_eq!(writes.len(), 3);
+        // 子表内容先完成，随后父项才指向它；两个 publish 不能只比较同名事件。
+        for pair in writes.windows(2) {
+            assert_eq!((pair[1].2 >> 10) << 12, pair[0].0 as u64);
+            assert_eq!(pair[1].2 & 0x3ff, 1);
+        }
     }
     assert_eq!(
-        space.query(VirtAddr(va.0 + 4095)),
+        space.query(VirtAddr(va.0 + (PAGE_SIZE - 1))),
         Ok(Some(Translation {
-            phys: PhysAddr(data.pa.0 + 4095),
+            phys: PhysAddr(data.pa.0 + (PAGE_SIZE - 1)),
             perm: MapPerm::RW
         }))
     );
@@ -392,6 +441,30 @@ fn map_rolls_back_each_new_table_and_preserves_existing_mapping() {
 }
 
 #[test]
+fn page_tables_do_not_borrow_whole_pages() {
+    let mut flags = [false; 32];
+    let mut memory = HostMemory::new(&mut flags);
+    let stats = memory.stats.clone();
+    let data = memory.alloc_zeroed_page().unwrap();
+    let layout = memory.layout();
+    let va = layout.test_window.start;
+    let mut arch = backend(stats.clone());
+    let mut space = KernelAddressSpace::new(&mut memory, &mut arch, layout).unwrap();
+    // SAFETY: 仅使用数值 CPU 和持有的测试页，不执行真实地址翻译。
+    unsafe {
+        space.activate().unwrap();
+        space.map_page(va, data.pa, MapPerm::RW).unwrap();
+        assert_eq!(space.query(va).unwrap().unwrap().phys, data.pa);
+        space.unmap_page(va).unwrap();
+        space.deactivate().unwrap();
+    }
+    space.destroy().unwrap();
+    assert_eq!(stats.byte_borrows.get(), 0);
+    drop(space);
+    release(&mut memory, data);
+}
+
+#[test]
 fn indexes_cross_two_mebibytes_and_one_gibibyte_without_aliasing() {
     for boundary in [0x200000, 0x40000000] {
         let mut flags = [false; 32];
@@ -399,13 +472,13 @@ fn indexes_cross_two_mebibytes_and_one_gibibyte_without_aliasing() {
         let data = memory.alloc_zeroed_page().unwrap();
         let other = memory.alloc_zeroed_page().unwrap();
         let mut layout = memory.layout();
-        layout.test_window = VirtAddr(boundary - 4096)..VirtAddr(boundary + 4096);
+        layout.test_window = VirtAddr(boundary - PAGE_SIZE)..VirtAddr(boundary + PAGE_SIZE);
         let mut arch = backend(memory.stats.clone());
         let mut space = KernelAddressSpace::new(&mut memory, &mut arch, layout).unwrap();
         // SAFETY: 两个独占页只参与数值映射；没有指针别名或并发。
         unsafe {
             space
-                .map_page(VirtAddr(boundary - 4096), data.pa, MapPerm::R)
+                .map_page(VirtAddr(boundary - PAGE_SIZE), data.pa, MapPerm::R)
                 .unwrap();
             space
                 .map_page(VirtAddr(boundary), other.pa, MapPerm::RX)
@@ -414,7 +487,7 @@ fn indexes_cross_two_mebibytes_and_one_gibibyte_without_aliasing() {
         assert_eq!(
             space.query(VirtAddr(boundary - 1)),
             Ok(Some(Translation {
-                phys: PhysAddr(data.pa.0 + 4095),
+                phys: PhysAddr(data.pa.0 + (PAGE_SIZE - 1)),
                 perm: MapPerm::R
             }))
         );

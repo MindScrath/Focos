@@ -40,6 +40,20 @@ unsafe impl VmPage for IdentityPage {
         // SAFETY: 当前独占句柄，调用协议禁止同时使用虚拟别名。
         f(unsafe { &mut *pointer })
     }
+    fn read_word(&self, slot: usize) -> u64 {
+        assert!(slot < PAGE_SIZE / size_of::<u64>());
+        let pointer = core::ptr::with_exposed_provenance::<u64>(self.address.0);
+        // SAFETY: 句柄持有完整、已初始化且页对齐的 RAM，索引已检查。
+        // 直接读取裸指针，不借用页内容；硬件可以同时读取已发布的表项。
+        unsafe { pointer.add(slot).read_volatile() }
+    }
+    fn write_word(&mut self, slot: usize, value: u64) {
+        assert!(slot < PAGE_SIZE / size_of::<u64>());
+        let pointer = core::ptr::with_exposed_provenance_mut::<u64>(self.address.0);
+        // SAFETY: 同上，完整对齐写入；独占的是句柄，不创建整页或表项引用。
+        // arch 保证软件串行修改，A/D 预置后硬件只读，并负责发布及 TLB 同步。
+        unsafe { pointer.add(slot).write_volatile(value) }
+    }
 }
 // SAFETY: MM-001 保证地址唯一，私有来源标识绑定标记存储；归还失败不消耗句柄。
 unsafe impl VmMemory for IdentityMemory<'_> {
@@ -82,6 +96,35 @@ mod tests {
     use std::boxed::Box;
 
     #[test]
+    fn word_access_changes_only_one_aligned_unit_and_rejects_out_of_bounds() {
+        use std::panic::{AssertUnwindSafe, catch_unwind};
+        let mut storage = Box::new(Buffer([0; PAGE_SIZE]));
+        let start = storage.0.as_mut_ptr().expose_provenance();
+        let mut flags = [false];
+        let allocator = PageAllocator::new(start, start + PAGE_SIZE, &mut flags).unwrap();
+        // SAFETY: 独占对齐 Box 存活至页归还；句柄持有期间不经 Box 访问存储。
+        let mut memory = unsafe { IdentityMemory::new(allocator) };
+        let mut page = memory.alloc_zeroed_page().unwrap();
+        let last = PAGE_SIZE / size_of::<u64>() - 1;
+        let pattern = 0x1234_5678_9abc_def0u64;
+        page.write_word(0, pattern);
+        page.write_word(last, !pattern);
+        assert_eq!(page.read_word(0), pattern);
+        assert_eq!(page.read_word(last), !pattern);
+        for slot in [last + 1, usize::MAX] {
+            assert!(catch_unwind(AssertUnwindSafe(|| page.read_word(slot))).is_err());
+            assert!(catch_unwind(AssertUnwindSafe(|| page.write_word(slot, 0))).is_err());
+        }
+        page.with_bytes(|bytes| {
+            assert_eq!(&bytes[..8], &pattern.to_ne_bytes());
+            assert_eq!(&bytes[PAGE_SIZE - 8..], &(!pattern).to_ne_bytes());
+            assert!(bytes[8..PAGE_SIZE - 8].iter().all(|byte| *byte == 0));
+        });
+        // SAFETY: 页面未映射且没有遗留引用。
+        assert!(unsafe { memory.release_page(page) }.is_ok());
+    }
+
+    #[test]
     fn identity_adapter_initializes_raw_storage_before_page_access() {
         let mut storage = Box::<Buffer>::new_uninit();
         let start = storage.as_mut_ptr().expose_provenance();
@@ -102,11 +145,11 @@ mod tests {
 
     #[test]
     fn identity_adapter_zeros_reuses_and_preserves_handle_on_rejected_release() {
-        let mut storage = Box::new(Buffer([0x91; 4096]));
+        let mut storage = Box::new(Buffer([0x91; PAGE_SIZE]));
         let start = storage.0.as_mut_ptr().expose_provenance();
         let mut flags = [false];
         let mut wrong_flags = [false];
-        let allocator = PageAllocator::new(start, start + 4096, &mut flags).unwrap();
+        let allocator = PageAllocator::new(start, start + PAGE_SIZE, &mut flags).unwrap();
         // SAFETY: Box 是完整对齐且独占的真实缓冲区，存活至所有页归还以后。
         let mut memory = unsafe { IdentityMemory::new(allocator) };
         let mut page = memory.alloc_zeroed_page().unwrap();

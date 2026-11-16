@@ -4,11 +4,11 @@
 
 ## 1. 准备环境
 
-需要 Linux、Git、rustup、make、sed、Python 3 和 QEMU RISC-V。开发机测试还需要本机 C 链接工具（`cc`）。Ubuntu / Debian 安装示例：
+需要 Linux、Git、rustup、make、sed、Python 3、binutils 的 `readelf` 和 QEMU RISC-V。开发机测试还需要本机 C 链接工具（`cc`）。Ubuntu / Debian 安装示例：
 
 ```sh
 sudo apt update
-sudo apt install -y git build-essential sed python3 qemu-system-misc binutils-riscv64-linux-gnu
+sudo apt install -y git build-essential binutils sed python3 qemu-system-misc binutils-riscv64-linux-gnu
 ```
 
 按 [rustup 官方说明](https://www.rust-lang.org/tools/install) 安装 Rust 管理器。仓库的 `rust-toolchain.toml` 固定工具链；首次运行会下载。Fedora 使用对应系统包；WSL2 可用于 QEMU 开发，板卡连接需另配。

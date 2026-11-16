@@ -34,7 +34,7 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
     hal::console_write("FOCOS_IRQ_OK\n");
     let layout = focos_kernel::platform::kernel_layout(range);
     hal::console_write_fmt(format_args!("FocOS VM layout: {layout:?}\n"));
-    let live = core::cell::Cell::new(0);
+    let live = focos_kernel::mm::vm_check::PageCount::default();
     // SAFETY: MM-002 的唯一分配器管理独占 RAM；该范围在 Bare 和基础页表中恒等可访问。
     let memory = unsafe { focos_kernel::mm::IdentityMemory::new(allocator) };
     let mut memory = focos_kernel::mm::vm_check::ObservedMemory::new(memory, &live);

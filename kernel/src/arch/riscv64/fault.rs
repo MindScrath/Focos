@@ -1,6 +1,7 @@
 //! 同步页异常的单次匹配记录；真实入口与开发机注入共用该匹配器。
 use crate::hal::{ExpectedFault, FaultInfo, FaultKind, ProbeError, ProbeOp, ProbeSite};
 use crate::mm::VirtAddr;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 /// 一次探针的预期与结果；汇编操作期间不保留指向该记录的引用。
 #[derive(Clone, Copy)]
@@ -68,14 +69,23 @@ impl Record {
     }
 }
 
-/// 拒绝重复安装、无效直接模式地址或读回不一致。
-fn validate_install(already: bool, requested: usize, actual: usize) -> Result<(), ProbeError> {
-    if already {
+/// 真实入口与测试共用安装状态机；失败不标为已安装，重复调用不再写寄存器。
+fn install_entry(
+    installed: &AtomicBool,
+    irqs_enabled: bool,
+    requested: usize,
+    write_read: impl FnOnce(usize) -> usize,
+) -> Result<(), ProbeError> {
+    if installed.load(Ordering::Relaxed) {
         return Err(ProbeError::AlreadyInstalled);
     }
-    if requested == 0 || !requested.is_multiple_of(4) || requested != actual {
+    if irqs_enabled || requested == 0 || !requested.is_multiple_of(4) {
         return Err(ProbeError::InstallFailed);
     }
+    if write_read(requested) != requested {
+        return Err(ProbeError::InstallFailed);
+    }
+    installed.store(true, Ordering::Relaxed);
     Ok(())
 }
 
@@ -186,18 +196,39 @@ mod tests {
     }
     #[test]
     fn failed_or_duplicate_installation_is_rejected() {
-        assert_eq!(validate_install(false, 0x80200000, 0x80200000), Ok(()));
+        let installed = AtomicBool::new(false);
+        let writes = core::cell::Cell::new(0);
+        let write_read = |value| {
+            writes.set(writes.get() + 1);
+            value
+        };
         assert_eq!(
-            validate_install(true, 0, 0),
+            install_entry(&installed, false, 0x80200000, write_read),
+            Ok(())
+        );
+        assert_eq!(
+            install_entry(&installed, false, 0x80200000, write_read),
             Err(ProbeError::AlreadyInstalled)
         );
+        assert_eq!(writes.get(), 1);
+    }
+    #[test]
+    fn failed_installation_can_retry_without_false_installed_state() {
+        let installed = AtomicBool::new(false);
+        for (irqs, entry) in [(true, 0x80200000), (false, 0), (false, 2)] {
+            assert_eq!(
+                install_entry(&installed, irqs, entry, |_| panic!("must not write stvec")),
+                Err(ProbeError::InstallFailed)
+            );
+        }
         assert_eq!(
-            validate_install(false, 0x80200000, 0),
+            install_entry(&installed, false, 0x80200000, |_| 0),
             Err(ProbeError::InstallFailed)
         );
+        assert!(!installed.load(Ordering::Relaxed));
         assert_eq!(
-            validate_install(false, 2, 2),
-            Err(ProbeError::InstallFailed)
+            install_entry(&installed, false, 0x80200000, |value| value),
+            Ok(())
         );
     }
 }

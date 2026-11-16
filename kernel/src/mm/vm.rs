@@ -145,7 +145,10 @@ impl From<PageAllocError> for VmError {
 /// # Safety
 /// 物理页首与闭包得到的缓冲区都须按 PAGE_SIZE 对齐，完整初始化且持有期内有效。
 /// 句柄不可伪造、复制或克隆；内容不借用资源服务的元数据。
-/// 物理地址稳定，访问必须与全部虚拟别名分时进行；句柄销毁不隐式归还分配标记。
+/// 物理地址稳定，整页借用必须与全部虚拟别名及硬件访问分时进行。
+/// word 入口只访问一个对齐的 64 位单元，不得形成页内容的 Rust 引用；
+/// 越界索引在访存前拒绝。硬件共享表页只能使用 word 入口，含义由 arch 解释。
+/// 句柄销毁不隐式归还分配标记。
 pub unsafe trait VmPage {
     /// 返回稳定的物理页首；开发机数值地址不等于缓冲区指针。
     fn phys_addr(&self) -> PhysAddr;
@@ -153,6 +156,11 @@ pub unsafe trait VmPage {
     fn with_bytes<R>(&self, f: impl FnOnce(&[u8; PAGE_SIZE]) -> R) -> R;
     /// 独占借用整页；期间不能通过其他物理路径或虚拟别名访问页面。
     fn with_bytes_mut<R>(&mut self, f: impl FnOnce(&mut [u8; PAGE_SIZE]) -> R) -> R;
+    /// 按完整 64 位 volatile 读取一个存储单元；slot 越界时 panic。
+    fn read_word(&self, slot: usize) -> u64;
+    /// 按完整 64 位 volatile 写入一个存储单元；slot 越界时 panic。
+    /// 硬件共享页只允许硬件读取；调用方负责发布顺序和修改后的地址转换同步。
+    fn write_word(&mut self, slot: usize, value: u64);
 }
 
 /// 复用物理页分配器的资源服务，分配的句柄不借用服务。

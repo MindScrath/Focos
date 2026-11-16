@@ -52,26 +52,21 @@ pub(crate) fn installed() -> bool {
 /// # Safety
 /// 唯一启动 hart、关中断且有有效内核栈；句柄持有至关机，不另行修改 stvec。
 pub unsafe fn install_fault_probe() -> Result<NativeFaultProbe, ProbeError> {
-    if INSTALLED.load(Ordering::Relaxed) {
-        return Err(ProbeError::AlreadyInstalled);
-    }
-    if hal::local_irqs_enabled() {
-        return Err(ProbeError::InstallFailed);
-    }
     let requested = focos_vm_trap_entry as *const () as usize;
-    let actual: usize;
-    // SAFETY: 调用者保证合法启动栈和单核；先安装，再允许启用分页。
-    unsafe {
-        asm!(
-            "csrw stvec, {entry}",
-            "csrr {actual}, stvec",
-            entry = in(reg) requested,
-            actual = out(reg) actual,
-            options(nostack),
-        );
-    }
-    validate_install(false, requested, actual)?;
-    INSTALLED.store(true, Ordering::Relaxed);
+    install_entry(&INSTALLED, hal::local_irqs_enabled(), requested, |entry| {
+        let actual: usize;
+        // SAFETY: 调用者保证单核、关中断和有效栈；共用状态机已拒绝重复安装。
+        unsafe {
+            asm!(
+                "csrw stvec, {entry}",
+                "csrr {actual}, stvec",
+                entry = in(reg) entry,
+                actual = out(reg) actual,
+                options(nostack),
+            );
+        }
+        actual
+    })?;
     Ok(NativeFaultProbe { _private: () })
 }
 
@@ -161,6 +156,7 @@ extern "C" fn focos_vm_trap(cause: usize, pc: usize, address: usize) -> usize {
             hal::console_write_fmt(format_args!(
                 "FOCOS_VM_UNEXPECTED scause={cause:#x} sepc={pc:#x} stval={address:#x}\n"
             ));
+            hal::console_write("FOCOS_PANIC\n");
             hal::shutdown(true)
         }
     }

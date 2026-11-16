@@ -3,44 +3,92 @@ use super::*;
 use crate::hal::{ExpectedFault, FaultInfo, FaultKind, FaultProbe, ProbeError, ProbeOp, VmArch};
 use core::{cell::Cell, ops::Range};
 
+/// 启动验收的外置计数；调用方只能读取，不能重置仍被持有的页数。
+#[derive(Default)]
+pub struct PageCount(Cell<usize>);
+impl PageCount {
+    /// 读取经过此计数器观察、尚未归还的页面数。
+    pub fn get(&self) -> usize {
+        self.0.get()
+    }
+}
 /// 仅供启动验收观察成功申请与归还，不扩充生产 VmMemory 接口。
 pub struct ObservedMemory<'a, M> {
     inner: M,
-    live: &'a Cell<usize>,
+    live: &'a PageCount,
+}
+/// 已计数的页；私有字段阻止把包装前的底层句柄当成已计数页归还。
+pub struct ObservedPage<'a, P> {
+    inner: P,
+    live: &'a PageCount,
 }
 impl<'a, M> ObservedMemory<'a, M> {
-    /// 从零开始统计此适配器取得的页面，计数器可在地址空间持有期间只读观察。
-    pub fn new(inner: M, live: &'a Cell<usize>) -> Self {
-        live.set(0);
+    /// 接管服务，不重置已有计数；此后只接收同一计数来源的包装页。
+    pub fn new(inner: M, live: &'a PageCount) -> Self {
         Self { inner, live }
     }
 }
-// SAFETY: 不改变底层页的生命周期或访问路径；只在成功分配/归还后更新外置计数。
-unsafe impl<M: VmMemory> VmMemory for ObservedMemory<'_, M> {
-    type Page = M::Page;
+// SAFETY: 独占底层句柄，所有访问原样转交；外置计数的寿命覆盖页句柄。
+unsafe impl<P: VmPage> VmPage for ObservedPage<'_, P> {
+    fn phys_addr(&self) -> PhysAddr {
+        self.inner.phys_addr()
+    }
+    fn with_bytes<R>(&self, f: impl FnOnce(&[u8; PAGE_SIZE]) -> R) -> R {
+        self.inner.with_bytes(f)
+    }
+    fn with_bytes_mut<R>(&mut self, f: impl FnOnce(&mut [u8; PAGE_SIZE]) -> R) -> R {
+        self.inner.with_bytes_mut(f)
+    }
+    fn read_word(&self, slot: usize) -> u64 {
+        self.inner.read_word(slot)
+    }
+    fn write_word(&mut self, slot: usize, value: u64) {
+        self.inner.write_word(slot, value);
+    }
+}
+// SAFETY: 包装页保留来源与所有权；预先检查计数，底层失败时重建原句柄且不改计数。
+unsafe impl<'a, M: VmMemory> VmMemory for ObservedMemory<'a, M> {
+    type Page = ObservedPage<'a, M::Page>;
     fn managed_range(&self) -> Range<PhysAddr> {
         self.inner.managed_range()
     }
     fn alloc_zeroed_page(&mut self) -> Result<Self::Page, PageAllocError> {
-        let page = self.inner.alloc_zeroed_page()?;
-        self.live.set(self.live.get() + 1);
-        Ok(page)
+        let next = self
+            .live
+            .get()
+            .checked_add(1)
+            .ok_or(PageAllocError::OutOfMemory)?;
+        let inner = self.inner.alloc_zeroed_page()?;
+        self.live.0.set(next);
+        Ok(ObservedPage {
+            inner,
+            live: self.live,
+        })
     }
     unsafe fn release_page(
         &mut self,
         page: Self::Page,
     ) -> Result<(), (PageAllocError, Self::Page)> {
-        // SAFETY: 原样转交调用者的已撤销、已同步和无引用前提。
-        unsafe {
-            self.inner.release_page(page)?;
+        if !core::ptr::eq(page.live, self.live) {
+            return Err((PageAllocError::InvalidAddress, page));
         }
-        self.live.set(
-            self.live
-                .get()
-                .checked_sub(1)
-                .expect("VM counter underflow"),
-        );
-        Ok(())
+        let Some(next) = self.live.get().checked_sub(1) else {
+            return Err((PageAllocError::NotAllocated, page));
+        };
+        // SAFETY: 原样转交调用者的已撤销、已同步和无引用前提。
+        match unsafe { self.inner.release_page(page.inner) } {
+            Ok(()) => {
+                self.live.0.set(next);
+                Ok(())
+            }
+            Err((error, inner)) => Err((
+                error,
+                ObservedPage {
+                    inner,
+                    live: page.live,
+                },
+            )),
+        }
     }
 }
 /// 验收失败的来源；任何错误都要求调用方终止启动。
@@ -82,7 +130,7 @@ pub unsafe fn check_paging<'a, M: VmMemory, A: VmArch, F: FaultProbe>(
     memory: &'a mut M,
     arch: &'a mut A,
     layout: KernelLayout,
-    live: &Cell<usize>,
+    live: &PageCount,
     return_code: &[u8],
     install: impl FnOnce() -> Result<F, ProbeError>,
     mut report: impl FnMut(&str),
@@ -335,6 +383,72 @@ unsafe fn release<M: VmMemory>(memory: &mut M, page: M::Page) -> Result<(), VmCh
 mod tests {
     use super::*;
     use crate::hal::ProbeSite;
+    use crate::mm::vm::tests::HostMemory;
+
+    #[test]
+    fn observer_rejection_preserves_page_content_and_counts() {
+        for share_count in [false, true] {
+            let mut flags = [false; 2];
+            let mut other_flags = [false; 2];
+            let live = PageCount::default();
+            let other_live = PageCount::default();
+            let mut owner = ObservedMemory::new(HostMemory::new(&mut flags), &live);
+            let mut other = ObservedMemory::new(
+                HostMemory::new(&mut other_flags),
+                if share_count { &live } else { &other_live },
+            );
+            let mut page = owner.alloc_zeroed_page().unwrap();
+            page.with_bytes_mut(|bytes| bytes.fill(0x73));
+            // SAFETY: 页面未映射且没有引用；错误来源必须保留原句柄和计数。
+            let (error, page) = unsafe { other.release_page(page) }.err().unwrap();
+            assert_eq!(error, PageAllocError::InvalidAddress);
+            assert_eq!(live.get(), 1);
+            assert_eq!(other_live.get(), 0);
+            page.with_bytes(|bytes| assert!(bytes.iter().all(|byte| *byte == 0x73)));
+            // SAFETY: 交回原服务，仍无映射或引用。
+            assert!(unsafe { owner.release_page(page) }.is_ok());
+            assert_eq!(live.get(), 0);
+        }
+    }
+
+    #[test]
+    fn count_failure_is_detected_before_releasing_the_page() {
+        let mut flags = [false; 2];
+        let live = PageCount::default();
+        let inner = HostMemory::new(&mut flags);
+        let stats = inner.stats.clone();
+        let mut memory = ObservedMemory::new(inner, &live);
+        let page = memory.alloc_zeroed_page().unwrap();
+        live.0.set(0); // 模拟封装内部计数损坏，公共调用者不能修改该字段。
+        // SAFETY: 页未映射，无遗留引用；失败不能先归还底层资源。
+        let (error, page) = unsafe { memory.release_page(page) }.err().unwrap();
+        assert_eq!(error, PageAllocError::NotAllocated);
+        assert_eq!(stats.live.get(), 1);
+        live.0.set(1);
+        // SAFETY: 恢复计数后归还原句柄，底层占用标记始终未变。
+        assert!(unsafe { memory.release_page(page) }.is_ok());
+        stats.budget.set(Some(0));
+        assert!(matches!(
+            memory.alloc_zeroed_page(),
+            Err(PageAllocError::OutOfMemory)
+        ));
+        assert_eq!(live.get(), 0);
+        assert_eq!(stats.live.get(), 0);
+    }
+
+    #[test]
+    fn observing_another_service_does_not_reset_owned_pages() {
+        let mut first_flags = [false; 2];
+        let mut second_flags = [false; 2];
+        let live = PageCount::default();
+        let mut first = ObservedMemory::new(HostMemory::new(&mut first_flags), &live);
+        let page = first.alloc_zeroed_page().unwrap();
+        let _second = ObservedMemory::new(HostMemory::new(&mut second_flags), &live);
+        assert_eq!(live.get(), 1);
+        // SAFETY: 独占测试页从未建立映射，也没有遗留引用。
+        assert!(unsafe { first.release_page(page) }.is_ok());
+        assert_eq!(live.get(), 0);
+    }
     struct Probe {
         result: Result<FaultInfo, ProbeError>,
     }

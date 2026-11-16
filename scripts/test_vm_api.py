@@ -99,6 +99,19 @@ class VmApiTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("lifetime may not live long enough", result.stderr)
 
+    def test_uncounted_page_cannot_be_released_through_observer(self):
+        result = self.compile("""
+            use focos_kernel::mm::vm_check::{ObservedMemory, PageCount};
+            pub unsafe fn call<M: VmMemory>(mut memory: M) {
+                let page = memory.alloc_zeroed_page().unwrap();
+                let live = PageCount::default();
+                let mut observed = ObservedMemory::new(memory, &live);
+                let _ = unsafe { observed.release_page(page) };
+            }
+        """)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("E0308", result.stderr)
+
     def test_native_page_is_neither_copy_nor_clone(self):
         for trait in ("Copy", "Clone"):
             with self.subTest(trait=trait):

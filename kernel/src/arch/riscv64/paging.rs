@@ -49,23 +49,11 @@ struct Path {
 
 /// 完整 64 位、对齐、volatile 访问；不把数字 PA 直接当指针。
 fn read<P: VmPage>(page: &P, slot: usize) -> u64 {
-    page.with_bytes(|bytes| {
-        // SAFETY: VmPage 保证 4096 对齐，slot 来自九位索引或 0..512。
-        unsafe { bytes.as_ptr().cast::<u64>().add(slot).read_volatile() }
-    })
+    page.read_word(slot)
 }
-/// 独占页内一次写入完整表项，父项发布顺序由调用方控制。
+/// 硬件共享页内写入完整表项，不创建整页引用；父项发布顺序由调用方控制。
 fn write<P: VmPage>(page: &mut P, slot: usize, value: u64) {
-    page.with_bytes_mut(|bytes| {
-        // SAFETY: 独占整页且索引在页内；一次写入完整 PTE，不能拆成较窄写。
-        unsafe {
-            bytes
-                .as_mut_ptr()
-                .cast::<u64>()
-                .add(slot)
-                .write_volatile(value);
-        }
-    });
+    page.write_word(slot, value);
 }
 /// 本阶段允许的空项、中间项和 4 KiB 叶项。
 enum Entry {
@@ -321,7 +309,7 @@ unsafe impl<C: VmCpu> VmArch for Sv39<C> {
     }
     fn current_root(&self) -> Result<Option<PhysAddr>, VmError> {
         let satp = self.cpu.read_satp();
-        if satp >> 60 == 0 {
+        if satp == 0 {
             return Ok(None);
         }
         if satp >> 60 != 8 || (satp >> 44) & 0xffff != 0 {

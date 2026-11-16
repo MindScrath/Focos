@@ -43,6 +43,22 @@ unsafe impl VmCpu for WriteFaultCpu {
 }
 
 #[test]
+fn malformed_bare_is_rejected_before_any_cpu_write() {
+    for satp in [1, 1usize << 44] {
+        let mut arch = backend(Default::default());
+        arch.cpu.satp = satp;
+        assert_eq!(arch.current_root(), Err(VmError::InvalidState));
+        // SAFETY: 只运行数值 CPU 模型；异常初态不能被覆盖成新页表。
+        assert_eq!(
+            unsafe { arch.activate(PhysAddr::from_raw(0x804000)) },
+            Err(VmError::InvalidState)
+        );
+        assert_eq!(arch.cpu.satp, satp);
+        assert!(arch.cpu.stats.events.borrow().is_empty());
+    }
+}
+
+#[test]
 fn activation_readback_mismatch_restores_bare_before_error() {
     // 分别覆盖未切换、模式错误、根页错误和地址空间编号错误。
     for actual in [

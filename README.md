@@ -111,7 +111,7 @@ Focos/
 │   ├── BOOT-001.md                    # QEMU 启动验收
 │   ├── MM-001.md                      # 页分配与回收
 │   ├── MM-002.md                      # QEMU 真实内存接入规格
-│   ├── MM-003.md                      # QEMU 内核分页与真实访问验收（草案）
+│   ├── MM-003.md                      # QEMU 内核分页与真实访问验收（实现待审阅）
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本

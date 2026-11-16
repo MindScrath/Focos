@@ -8,9 +8,19 @@ from unittest.mock import patch
 import smoke
 
 
+VM_SYMBOLS = {
+    "__code_start": 0x80200000, "__code_end": 0x80208000,
+    "__rodata_start": 0x80208000, "__rodata_end": 0x8020a000,
+    "__writable_start": 0x8020a000, "__kernel_end": 0x80224000,
+    "focos_probe_read_pc": 0x80202000, "focos_probe_write_pc": 0x80201000,
+}
+
 SUCCESS = """OpenSBI v1.3.1
+FocOS memory: [0x80224000, 0x87e00000)
 FOCOS_MM_OK
 FOCOS_IRQ_OK
+FocOS VM layout: KernelLayout { code: PhysAddr(2149580800)..PhysAddr(2149613568), rodata: PhysAddr(2149613568)..PhysAddr(2149621760), writable: PhysAddr(2149621760)..PhysAddr(2149728256), allocatable: PhysAddr(2149728256)..PhysAddr(2279604224), test_window: VirtAddr(18446743798831644672)..VirtAddr(18446743798831661056) }
+FocOS VM CPU: satp=0x8000000000080226 mode=Sv39 asid=0 root=0x80226000
 FOCOS_VM_ENABLED
 FOCOS_VM_ALIAS_OK
 FOCOS_VM_FAULT scause=0xf sepc=0x80201000 stval=0xffffffc000001000
@@ -21,7 +31,9 @@ FOCOS_VM_FAULT scause=0xd sepc=0x80202000 stval=0xffffffc000000000
 FOCOS_VM_UNMAP_OK
 FOCOS_VM_REMAP_OK
 FOCOS_VM_CLEAN_OK
+FocOS VM CPU: satp=0x8000000000080224 mode=Sv39 asid=0 root=0x80224000
 FOCOS_VM_LIFECYCLE_OK
+FocOS VM retained table pages: 64
 FOCOS_VM_OK
 FOCOS_BOOT_OK
 """
@@ -29,6 +41,12 @@ FOCOS_BOOT_OK
 
 class ResultTests(unittest.TestCase):
     """验证各合同的成功标记、顺序和退出状态；固件版本不作为通过条件。"""
+
+    def setUp(self):
+        """结果判定使用独立 ELF 符号夹具；真实读取另由符号解析测试覆盖。"""
+        patcher = patch.object(smoke, "load_vm_symbols", return_value=VM_SYMBOLS)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_accepts_complete_results(self):
         """启动、内存、中断和分页合同都能从完整输出中取到自己的标记。"""
@@ -112,10 +130,84 @@ class ResultTests(unittest.TestCase):
                 "FOCOS_MM_OK\nFOCOS_IRQ_OK\nFOCOS_BOOT_OK\n", 0, "vm",
             )
 
+    def test_vm_rejects_wrong_nonzero_instruction_addresses(self):
+        """非零不等于实际探针位置，读写异常都须核对本次 ELF。"""
+        for pc in ("0x80201000", "0x80202000"):
+            with self.subTest(pc=pc), self.assertRaises(ValueError):
+                smoke.validate_result(SUCCESS.replace(f"sepc={pc}", "sepc=0x1"), 0, "vm")
+
+    def test_vm_requires_cpu_and_layout_records(self):
+        """只有成功标记及异常事件，不构成完整分页证据。"""
+        for prefix in ("FocOS VM CPU:", "FocOS VM layout:", "FocOS memory:",
+                       "FocOS VM retained table pages:"):
+            output = "\n".join(line for line in SUCCESS.splitlines() if not line.startswith(prefix))
+            with self.subTest(prefix=prefix), self.assertRaises(ValueError):
+                smoke.validate_result(output, 0, "vm")
+
+    def test_vm_rejects_invalid_or_reordered_state_evidence(self):
+        """状态记录须来自同一布局，且分别位于首次启用和最终重建阶段。"""
+        cpu = [line for line in SUCCESS.splitlines() if line.startswith("FocOS VM CPU:")]
+        layout = next(line for line in SUCCESS.splitlines() if line.startswith("FocOS VM layout:"))
+        outputs = [
+            SUCCESS.replace("satp=0x8000000000080226", "satp=0x9000000000080226"),
+            SUCCESS.replace("satp=0x8000000000080226", "satp=0x8000100000080226"),
+            SUCCESS.replace("root=0x80226000", "root=0x80227000"),
+            SUCCESS.replace("root=0x80226000", "root=0x80226001"),
+            SUCCESS.replace("mode=Sv39", "mode=Bare", 1),
+            SUCCESS.replace("asid=0", "asid=1", 1),
+            SUCCESS.replace("2149613568", "2149609472"),
+            SUCCESS.replace("2149728256", "2149732352"),
+            SUCCESS.replace("18446743798831661056", "18446743798831665152"),
+            SUCCESS.replace("[0x80224000,", "[0x80225000,"),
+            SUCCESS.replace("retained table pages: 64", "retained table pages: 63"),
+            SUCCESS + cpu[0] + "\n", SUCCESS + layout + "\n",
+            SUCCESS.replace(cpu[0] + "\n", ""), SUCCESS.replace(cpu[1] + "\n", ""),
+            SUCCESS.replace(cpu[0] + "\n", "") + cpu[0] + "\n",
+            cpu[1] + "\n" + SUCCESS.replace(cpu[1] + "\n", ""),
+        ]
+        for output in outputs:
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                smoke.validate_result(output, 0, "vm")
+
+    def test_vm_uses_current_elf_probe_locations(self):
+        """另一份 ELF 的合法探针地址不能复用旧日志中的指令地址。"""
+        symbols = dict(VM_SYMBOLS, focos_probe_write_pc=0x80203000)
+        with self.assertRaises(ValueError):
+            smoke.validate_result(SUCCESS, 0, "vm", symbols)
+        smoke.validate_result(SUCCESS.replace("sepc=0x80201000", "sepc=0x80203000"),
+                              0, "vm", symbols)
+
     def test_vm_exit_status_is_required(self):
         """全部事件已输出也不能掩盖退出失败。"""
         with self.assertRaisesRegex(ValueError, "status"):
             smoke.validate_result(SUCCESS, 1, "vm")
+
+
+class SymbolTests(unittest.TestCase):
+    """核对 readelf 输出解析和错误传播，不把缺少符号当成跳过验收。"""
+
+    def setUp(self):
+        self.table = "\n".join(
+            f"  {index}: {value:016x} 0 NOTYPE GLOBAL DEFAULT 1 {name}"
+            for index, (name, value) in enumerate(VM_SYMBOLS.items(), 1))
+
+    def test_symbols_are_loaded_from_the_selected_elf(self):
+        with patch.object(smoke.subprocess, "check_output", return_value=self.table) as read:
+            self.assertEqual(smoke.load_vm_symbols(pathlib.Path("selected.elf")), VM_SYMBOLS)
+            self.assertEqual(read.call_args.args[0],
+                             ["readelf", "--wide", "--symbols", "selected.elf"])
+
+    def test_missing_duplicate_undefined_and_unreadable_symbols_fail(self):
+        lines = self.table.splitlines()
+        for table in ("\n".join(lines[1:]), self.table + "\n" + lines[0],
+                      self.table.replace("DEFAULT 1", "DEFAULT UND", 1)):
+            with patch.object(smoke.subprocess, "check_output", return_value=table), \
+                    self.assertRaises(ValueError):
+                smoke.load_vm_symbols(pathlib.Path("kernel"))
+        for error in (FileNotFoundError("readelf"), subprocess.CalledProcessError(1, "readelf")):
+            with patch.object(smoke.subprocess, "check_output", side_effect=error), \
+                    self.assertRaises(ValueError):
+                smoke.load_vm_symbols(pathlib.Path("kernel"))
 
 
 class RunnerTests(unittest.TestCase):
