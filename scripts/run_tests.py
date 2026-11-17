@@ -487,6 +487,9 @@ def main(argv: list[str] | None = None) -> int:
             print('reference manifest cannot be combined with legacy',file=sys.stderr)
             return 2
         args.reference = 'strict'
+    if args.reference == 'strict' and args.platform != 'qemu':
+        print('strict reference requires --platform qemu',file=sys.stderr)
+        return 2
     snapshot = InputSnapshot(digest)
     # Python 已加载的实现必须先固定身份，不能等耗时的大构件哈希后才读源码版本。
     source_hashes = {str(p.relative_to(ROOT)): snapshot.digest(p) for p in
@@ -672,6 +675,9 @@ def main(argv: list[str] | None = None) -> int:
     changed = snapshot.changes()
     provenance = None
     strict = args.reference == 'strict' or (args.reference is None and environment['status'] != 'NOT_APPLICABLE')
+    if strict and args.platform != 'qemu':
+        print('strict reference requires --platform qemu',file=sys.stderr)
+        return 2
     if strict and not changed:
         try:
             if args.reference_manifest is None or args.reference_artifacts is None:
@@ -722,6 +728,10 @@ def main(argv: list[str] | None = None) -> int:
                 sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
                 sub.update(status=result['status'], **{'pass': 0, 'score': 0.0})
 
+    replay_unverified = bool(args.log and strict)
+    if replay_unverified and environment['status'] == 'VALID':
+        environment['status'] = 'REPLAY_UNVERIFIED'
+        environment['errors'].append('log protocol and artifacts match; original capture argv, QEMU and platform are unverified')
     totals = summarize(results)
     import datetime
 
@@ -741,7 +751,8 @@ def main(argv: list[str] | None = None) -> int:
         'reference_provenance': provenance,
         'reference_command_verified': command_verified,
         'qemu': qemu,
-        'execution_valid': not invalid_execution and environment['status'] != 'LEGACY_UNVERIFIED' and not any(
+        'capture_conditions_verified': bool(args.capture_cmd and command_verified and not invalid_execution),
+        'execution_valid': not replay_unverified and not invalid_execution and environment['status'] != 'LEGACY_UNVERIFIED' and not any(
             section.truncated for (group,libc),section in sections.items() if group in selected and libc == args.libc),
         'log_error': log_error,
         'source_sha256': source_hashes,
@@ -789,7 +800,7 @@ def main(argv: list[str] | None = None) -> int:
     write_summary(out_dir, meta, results, totals)
 
     print(json.dumps(totals, ensure_ascii=False))
-    return 0 if environment["status"] != "LEGACY_UNVERIFIED" and all(r["status"] == "PASS" for r in results) else 1
+    return 0 if meta['execution_valid'] and all(r["status"] == "PASS" for r in results) else 1
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 # PR29 Python 启动与 strict 参数补充修复（2026-11-17）
 
+> 可信度更正（2026-11-17）：本页历史 strict 回放的 execution_valid=true 声明已撤回。日志重判分数保留，但 build ID 不能认证原采集的实际内核、磁盘、QEMU 和 argv。当前回放标为 REPLAY_UNVERIFIED，退出 1；原文件与哈希保留供审计。
+
 继续跟进 335f5d1 的 Codex 评审，发现两处有效遗漏。此前的 -B 只禁止写入 pyc，不能禁止读取，因此工作树已有缓存且源文件等长、时间戳仍有效时，源码哈希可能与实际执行模块不一致。另一方面，strict capture 已检查必填参数，strict replay 却到运行后才报告缺失，错误地退出 1 而非参数错误 2。
 
 五个 CLI 入口在任何项目导入前建立每次运行私有的空 pycache，并禁止写缓存，退出时显式清理；不删除共享 __pycache__。所有 Python judge 子进程使用独立空缓存前缀和 -B，覆盖 common/inventory 及自定义 helper。Makefile 的两类 Python 测试、测试中的 judge 子进程和受控构建进程也隔离缓存；构建测试直接编译源文件，避免验证本身读到旧代码。

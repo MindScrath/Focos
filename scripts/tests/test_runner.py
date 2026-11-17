@@ -386,7 +386,7 @@ class RunnerSafetyTests(unittest.TestCase):
 
     def test_manifest_without_mode_requires_reference_protocol(self):
         proc,data,_=self.invoke(self.reference())
-        self.assertEqual(proc.returncode,0)
+        self.assertEqual(proc.returncode,1)
         self.assertIsNotNone(data['meta']['reference_provenance'])
         proc,data,_=self.invoke(self.reference(),['--reference','legacy'])
         self.assertEqual(proc.returncode,2)
@@ -452,6 +452,21 @@ class RunnerSafetyTests(unittest.TestCase):
                         code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(RUNNER),'--out',str(out),'--libc','musl','--group','iperf'])
                     self.assertEqual(code,2)
                     self.assertEqual(sentinel.read_bytes(),b'preserve')
+
+    def test_strict_replay_cannot_verify_original_capture_conditions(self):
+        proc,data,_=self.invoke(self.reference(),['--reference','strict'])
+        self.assertEqual(proc.returncode,1)
+        self.assertFalse(data['meta']['execution_valid'])
+        self.assertEqual(data['meta']['environment']['status'],'REPLAY_UNVERIFIED')
+        self.assertEqual(data['groups'][0]['status'],'PASS')
+        self.assertIsNotNone(data['meta']['reference_provenance'])
+
+    def test_strict_reference_rejects_non_qemu_platform(self):
+        for mode in [[],['--reference','strict']]:
+            with self.subTest(mode=mode):
+                proc,data,_=self.invoke(self.reference(),mode+['--platform','visionfive2'])
+                self.assertEqual(proc.returncode,2)
+                self.assertIsNone(data)
 
     def test_empty_source_arguments_are_rejected_before_execution(self):
         import contextlib,io,run_tests
@@ -600,13 +615,13 @@ class RunnerSafetyTests(unittest.TestCase):
 
     def test_valid_reference_protocol_and_test_exit_are_distinct(self):
         proc, data, _ = self.invoke(self.reference(), ['--reference', 'strict'])
-        self.assertEqual(proc.returncode, 0)
-        self.assertEqual(data['meta']['environment']['status'], 'VALID')
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(data['meta']['environment']['status'], 'REPLAY_UNVERIFIED')
         proc, data, _ = self.invoke(self.reference(3), ['--reference', 'strict'])
         self.assertEqual(proc.returncode, 1)
         self.assertEqual(data['groups'][0]['status'], 'FAIL')
         self.assertEqual(data['totals']['pass'], 0)
-        self.assertEqual(data['meta']['environment']['status'], 'VALID')
+        self.assertEqual(data['meta']['environment']['status'], 'REPLAY_UNVERIFIED')
 
     def test_reference_order_missing_and_duplicate_markers_are_errors(self):
         good = self.reference()
@@ -655,7 +670,7 @@ class RunnerSafetyTests(unittest.TestCase):
     def test_crlf_reference_binds_manifest_and_preserves_serial_bytes(self):
         raw = self.reference().replace(b'\n', b'\r\n')
         proc, data, out = self.invoke(raw, ['--reference', 'strict'])
-        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.returncode, 1)
         self.assertTrue(data['meta']['reference_provenance']['inputs_pinned'])
         self.assertIn(b'REF_BUILD_ID ', (out/'serial.log').read_bytes())
         self.assertEqual((out/'serial.log').read_bytes().count(b'\r\n'), raw.count(b'\r\n')+1)
@@ -913,7 +928,7 @@ class RunnerSafetyTests(unittest.TestCase):
         from reference_manifest import verify_manifest
         from inventory import load_inventory
         proc, data, out = self.invoke(self.reference(), ['--reference','strict'])
-        self.assertEqual(proc.returncode,0)
+        self.assertEqual(proc.returncode,1)
         root=out.parent;image=root/'disk.img';inventory=root/'inventory.json'
         args=[root/'build.manifest.json',[root/'Image',root/'initramfs.gz'],(out/'serial.log').read_text(),load_inventory(inventory),['iperf'],'musl',inventory]
         with self.assertRaisesRegex(ValueError,'disk'):verify_manifest(*args)
@@ -932,7 +947,7 @@ class RunnerSafetyTests(unittest.TestCase):
     def test_strict_disk_changed_before_or_during_capture_never_passes(self):
         import run_tests,contextlib,io,shlex
         from unittest.mock import patch
-        for stage in ['before','during','qemu']:
+        for stage in ['before','during','qemu','unchanged','wrong-platform']:
             proc,data,out=self.invoke(self.reference(),['--reference','strict']);root=out.parent
             image=root/'disk.img';kernel=root/'Image';init=root/'initramfs.gz'
             command=shlex.join(['qemu-system-riscv64','-machine','virt','-m','1G','-smp','1','-nographic','-no-reboot','-snapshot',
@@ -944,16 +959,22 @@ class RunnerSafetyTests(unittest.TestCase):
             if stage=='before':image.write_bytes(b'replaced disk')
             def capture(cmd,timeout):
                 self.assertIsInstance(cmd,list)
-                (qemu if stage=='qemu' else image).write_bytes(b'mutated while running')
+                if stage in ('during','qemu'):
+                    (qemu if stage=='qemu' else image).write_bytes(b'mutated while running')
                 return (out/'serial.log').read_bytes(),False,0
             dest=root/'capture-out'
             with self.subTest(stage=stage),patch.object(run_tests,'qemu_identity',return_value=info),patch.object(run_tests,'capture',side_effect=capture) as mocked,contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
                 code=run_tests.main(['--capture-cmd',command,'--out',str(dest),'--libc','musl','--group','iperf',
                                      '--reference','strict','--reference-image',str(image),'--inventory',str(root/'inventory.json'),
                                      '--reference-manifest',str(root/'build.manifest.json'),'--reference-artifacts',str(kernel),str(init),
-                                     '--team-judge-dir',str(TEAM_DIR)])
-            self.assertEqual(code,2 if stage=='before' else 1)
-            if stage=='before':mocked.assert_not_called()
+                                     '--team-judge-dir',str(TEAM_DIR),'--platform','visionfive2' if stage=='wrong-platform' else 'qemu'])
+            self.assertEqual(code,0 if stage=='unchanged' else 2 if stage in ('before','wrong-platform') else 1)
+            if stage in ('before','wrong-platform'):mocked.assert_not_called()
+            elif stage=='unchanged':
+                result=json.loads((dest/'summary.json').read_text())
+                self.assertTrue(result['meta']['execution_valid'])
+                self.assertTrue(result['meta']['capture_conditions_verified'])
+                self.assertEqual(result['meta']['platform'],'qemu')
             else:
                 result=json.loads((dest/'summary.json').read_text())
                 self.assertEqual(result['groups'][0]['status'],'ENV_ERROR')
@@ -1033,7 +1054,7 @@ class RunnerSafetyTests(unittest.TestCase):
             for rewrite_content in [False,True]:
                 with self.subTest(artifact=artifact,rewrite_content=rewrite_content):
                     proc,data,out=self.invoke(self.reference(),['--reference','strict'])
-                    self.assertEqual(proc.returncode,0)
+                    self.assertEqual(proc.returncode,1)
                     root=out.parent;path=root/'build.manifest.json';manifest=json.loads(path.read_text())
                     changed=root/artifact;changed.write_bytes(changed.read_bytes()+b'changed artifact')
                     key='kernel_sha256' if artifact=='Image' else 'initramfs_sha256'

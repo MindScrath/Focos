@@ -179,3 +179,11 @@ tar -xzf target/raw-evidence/test-001-pr29-raw-2026-11-17.tar.gz -C target/raw-e
 官方 judge 无本地依赖，目录只允许清单固定的五个脚本和被隔离的 __pycache__，额外模块/包/数据会被缓存检查及 runner 拒绝；子进程副本也仅包含固定脚本。显式传 manifest 即启用 strict 日志与构建 ID 校验，与 legacy 同时使用退出 2。serial.log、summary.json、summary.md 采用同目录临时文件原子替换，复用输出不会改写外部硬链接指向的旧证据；不承诺三个文件跨文件事务。
 
 自定义清单不能改写组的 kind/judge_file/mode 或官方 judge 仓库/提交/哈希；官方组期望项仍可调整，团队组保持冻结项。输出路径自身及全部祖先拒绝符号链接，采集前与落盘前复查。lmdd 的含空格 label 同时识别 shell 带引号形式和 BusyBox xtrace 的精确冻结展开，两者共用尝试记录及未知名称判断。
+
+## 回放可信度更正
+
+strict 回放只能核对当前声明构件、日志 build ID、协议和判分，不能证明原采集实际使用了这些内核/磁盘/QEMU/argv。因此所有 strict --log 在协议和构件匹配时标为 REPLAY_UNVERIFIED，execution_valid=false、capture_conditions_verified=false，退出 1。逐项 PASS/9/9 仅表示该日志重判结果，不构成有效平台成绩；协议或构件错误继续拒绝。当前没有支持将外部 capture 元数据提升为可信认证的接口。需要记录实际采集条件时使用 strict capture，其规范化 argv、实际 QEMU 身份和文件哈希由本次运行记录。
+
+strict（含显式 manifest 自动模式）只接受 --platform qemu，冲突在采集前拒绝；自动识别参考日志时也检查。普通用户自声明平台不构成真板验收证据。
+
+此前 schema2-lua、preflight、ownership、startup、judges 等历史 replay.summary.json 中的 execution_valid=true 是旧实现的错误可信度声明，现明确撤回：原始文件和哈希保留用于审计，日志重判分数保留，但不能据其认定原始采集条件已验证。更正后的真实日志回放见 [round17.json](../../tests/results/review-2026-11-17/judges/round17.json)；未新增参考 Linux 采集。
