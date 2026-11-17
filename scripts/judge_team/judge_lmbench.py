@@ -9,7 +9,7 @@ import shlex
 import sys
 
 from common import NUMBER, emit, expected, positive
-from lmbench_trace import COMMAND_INDEX
+from lmbench_trace import command_index
 
 names = expected('lmbench')
 labels = [r'Simple syscall', r'Simple read', r'Simple write', r'Simple stat', r'Simple fstat',
@@ -65,7 +65,7 @@ for raw in sys.stdin.read().splitlines():
         except ValueError:
             continue
         if args and args[0] == './lmbench_all':
-            context = COMMAND_INDEX.get(tuple(args[1:]))
+            context = command_index(args[1:])
         if context is not None:
             start_attempt(context,traced=True)
         continue

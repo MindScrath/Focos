@@ -145,3 +145,14 @@ class JudgeTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual(judge('lmbench',trace+result+'\n')[index]['pass'],1)
                 self.assertEqual(judge('lmbench',trace+trace+result+'\n')[index]['pass'],0)
+
+    def test_busybox_expanded_lmdd_trace_reserves_missing_attempt(self):
+        trace='+ ./lmbench_all lmdd label=File /var/tmp/XXX write bandwidth: of=/var/tmp/XXX move=1m fsync=1 print=3\n'
+        result='File /var/tmp/XXX write bandwidth: 123 KB/sec\n'
+        self.assertEqual(judge('lmbench',trace+result)[14]['pass'],1)
+        self.assertEqual(judge('lmbench',trace+trace+result)[14]['pass'],0)
+        from lmbench_trace import logged_names
+        from inventory import load_inventory
+        names=load_inventory()['groups']['lmbench']['subcases']
+        self.assertEqual(logged_names(trace,names),{names[14]})
+        self.assertNotEqual(logged_names(trace.replace('move=1m','move=2m'),names),{names[14]})

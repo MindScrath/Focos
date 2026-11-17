@@ -416,6 +416,43 @@ class RunnerSafetyTests(unittest.TestCase):
                 self.assertEqual(archive.read_bytes(),b'old evidence')
                 self.assertFalse(archive.samefile(out/name))
 
+    def test_custom_inventory_cannot_change_judge_provenance(self):
+        import run_tests,contextlib,io,copy
+        from unittest.mock import patch
+        from inventory import load_inventory
+        for kind in ['commit','repo','hash','kind','mode']:
+            with self.subTest(kind=kind),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);data=copy.deepcopy(load_inventory())
+                if kind in ('commit','repo'): data['judge'][kind]='a'*40 if kind=='commit' else 'https://github.com/other/repo'
+                elif kind=='hash':data['judge']['files']['judge_basic.py']='a'*64
+                elif kind=='kind':
+                    data['groups']['iperf'].update(kind='official',judge_file='judge_iperf.py')
+                    data['judge']['files']['judge_iperf.py']='a'*64
+                else:data['groups']['basic']['mode']='performance'
+                path=root/'inventory.json';path.write_text(json.dumps(data))
+                with patch.object(run_tests,'capture',return_value=(self.complete(),False,0)) as cap,contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+                    code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(RUNNER),'--out',str(root/'out'),'--libc','musl','--group','iperf','--inventory',str(path)])
+                self.assertEqual(code,2)
+                cap.assert_not_called()
+
+    def test_output_ancestor_symlinks_are_rejected_before_and_after_capture(self):
+        import run_tests,contextlib,io
+        from unittest.mock import patch
+        for ancestor in [False,True]:
+            for stage in ['before','capture']:
+                with self.subTest(ancestor=ancestor,stage=stage),tempfile.TemporaryDirectory() as tmp:
+                    root=Path(tmp);archive=root/'archive';target=archive/'child' if ancestor else archive
+                    (target/'sections').mkdir(parents=True);sentinel=target/'sections/keep';sentinel.write_bytes(b'preserve')
+                    alias=root/'alias';out=alias/'child' if ancestor else alias
+                    if stage=='before':alias.symlink_to(archive,target_is_directory=True)
+                    def capture(*args):
+                        if stage=='capture':alias.symlink_to(archive,target_is_directory=True)
+                        return self.complete(),False,0
+                    with patch.object(run_tests,'capture',side_effect=capture),contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+                        code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(RUNNER),'--out',str(out),'--libc','musl','--group','iperf'])
+                    self.assertEqual(code,2)
+                    self.assertEqual(sentinel.read_bytes(),b'preserve')
+
     def test_empty_source_arguments_are_rejected_before_execution(self):
         import contextlib,io,run_tests
         from unittest.mock import patch

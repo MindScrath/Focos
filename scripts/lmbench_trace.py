@@ -31,6 +31,14 @@ COMMANDS = (
 COMMAND_INDEX = {command: index for index, command in enumerate(COMMANDS)}
 
 
+def command_index(command):
+    command = tuple(command)
+    # BusyBox xtrace 不保留含空格参数的引号；仅接纳冻结 lmdd 的精确展开。
+    if command == tuple(' '.join(COMMANDS[14]).split()):
+        return 14
+    return COMMAND_INDEX.get(command)
+
+
 def logged_names(text, names):
     result = set()
     for raw in text.splitlines():
@@ -46,6 +54,6 @@ def logged_names(text, names):
         if not args or args[0] != './lmbench_all':
             continue
         command = tuple(args[1:])
-        index = COMMAND_INDEX.get(command)
+        index = command_index(command)
         result.add(names[index] if index is not None else 'lmbench ' + shlex.join(command))
     return result

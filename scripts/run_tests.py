@@ -397,7 +397,14 @@ def summarize(results: list[dict]) -> dict:
     return totals
 
 
+def reject_output_links(path):
+    for component in (path.absolute(), *path.absolute().parents):
+        if component.is_symlink():
+            raise ValueError('output path contains a symlink: '+str(component))
+
+
 def atomic_write(path, raw):
+    reject_output_links(path.parent)
     with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.result-', delete=False) as handle:
         stage = Path(handle.name)
         try:
@@ -487,6 +494,11 @@ def main(argv: list[str] | None = None) -> int:
                      ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py', ROOT/'scripts/lmbench_trace.py']}
 
     out_dir = Path(args.out)
+    try:
+        reject_output_links(out_dir)
+    except ValueError as exc:
+        print(str(exc),file=sys.stderr)
+        return 2
     sections_dir = out_dir/'sections'
     if sections_dir.is_symlink() or (sections_dir.exists() and not sections_dir.is_dir()):
         print('sections must be a real directory', file=sys.stderr)
@@ -527,6 +539,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     canonical = load_inventory()
+    if inventory['judge'] != canonical['judge'] or any(
+            group not in canonical['groups'] or any(
+                cfg.get(key, 'pass_fail' if key == 'mode' else None) !=
+                canonical['groups'][group].get(key, 'pass_fail' if key == 'mode' else None)
+                for key in ('kind','judge_file','mode'))
+            for group,cfg in groups_cfg.items()):
+        print('inventory changes frozen judge provenance',file=sys.stderr)
+        return 2
     for group in selected:
         cfg = groups_cfg[group]
         if cfg['kind'] == 'team' and (group not in canonical['groups'] or
@@ -735,6 +755,11 @@ def main(argv: list[str] | None = None) -> int:
         meta['replayed_at'] = timestamp
         meta['replayed_from'] = {'path': str(Path(args.log)), 'sha256': meta['log_sha256']}
 
+    try:
+        reject_output_links(out_dir)
+    except ValueError as exc:
+        print(str(exc),file=sys.stderr)
+        return 2
     # 外部采集命令也可能新建别名；落盘前再次检查，不能只检查启动时的目录。
     if sections_dir.is_symlink() or (sections_dir.exists() and not sections_dir.is_dir()) or any(p.is_symlink() for p in managed_files) or managed_outputs_overlap():
         print('managed outputs overlap or changed into a symlink/non-directory', file=sys.stderr)
