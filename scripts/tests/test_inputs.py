@@ -15,6 +15,29 @@ from ref.replay_evidence import unpack
 
 
 class InputTests(unittest.TestCase):
+    def test_raw_serial_evidence_has_an_external_hash_index(self):
+        import re, subprocess
+        index=json.loads((ROOT/'tests/results/raw-evidence-2026-11-17.json').read_text())
+        self.assertRegex(index['archive_sha256'],r'^[0-9a-f]{64}$')
+        self.assertEqual(len(index['files']),4)
+        for name,sha in index['files'].items():
+            path=Path(name)
+            self.assertFalse(path.is_absolute())
+            self.assertNotIn('..',path.parts)
+            self.assertRegex(sha,r'^[0-9a-f]{64}$')
+            self.assertFalse((ROOT/path).exists())
+            if 'schema2-lua' in name:
+                validation=ROOT/'tests/results/reference-2026-11-16/payload-binding.json'
+                key='schema2-lua/serial.log'
+            else:
+                validation=(ROOT/path).parents[1]/'validation.json';key='lua/serial.log'
+            self.assertEqual(json.loads(validation.read_text())['evidence_sha256'][key],sha)
+        tracked=subprocess.check_output(['git','ls-files','-z','--','*.log'],cwd=ROOT).split(b'\0')
+        for name in tracked:
+            path=ROOT/name.decode() if name else None
+            if path is not None and path.is_file():
+                self.assertIsNone(re.search(rb'[A-Za-z0-9_.+%-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}',path.read_bytes()),str(path))
+
     def test_inventory_projections_are_current(self):
         sync(check=True)
 

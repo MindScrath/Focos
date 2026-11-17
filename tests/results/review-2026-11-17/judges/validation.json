@@ -1,0 +1,92 @@
+{
+  "kind": "frozen_judge_execution_and_trace_diagnostics",
+  "base_commit": "32f69331b1bcfb6c2be68ee8eefb72f960305fae",
+  "checks": {
+    "test001": 119,
+    "rust": 52,
+    "existing_python": 15,
+    "qemu_kernel": [
+      "BOOT-001",
+      "MM-002",
+      "ARCH-001"
+    ]
+  },
+  "regressions_before_fix": {
+    "failed_assertions": 4,
+    "directory_alias_switch": [
+      "script",
+      "helper",
+      "package"
+    ],
+    "unknown_lmbench_trace": true
+  },
+  "runtime": [
+    {
+      "libc": "glibc",
+      "mode": "replay",
+      "image_hash_reads": 2,
+      "execution_valid": true,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      }
+    },
+    {
+      "libc": "musl",
+      "mode": "replay",
+      "image_hash_reads": 2,
+      "execution_valid": true,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      }
+    }
+  ],
+  "historical_replay": {
+    "samples": 15,
+    "all_expected_match": true,
+    "exact_groups": 13,
+    "totals_unchanged": true
+  },
+  "source_sha256": {
+    "scripts/run_tests.py": "1b1770143421f4eaf2fbe5596a88f23ac3d6818636f741e5ff1d07826f2bd665",
+    "scripts/lmbench_trace.py": "a910ac048653853073a7b16372a73dc844c9f9a9c878a5207166e9c937ef4c9d",
+    "scripts/judge_team/judge_lmbench.py": "2e4874bc427b3b179b284a407120b2b7adebeb08f52e10978525100b1c14d047",
+    "scripts/tests/test_runner.py": "55c925e3ff286e235d7f24b3876d47a300c6a6bc26229b918001bb6cb21908f9",
+    "scripts/tests/test_inputs.py": "1265827930304894d4c055bcc29cf8f49d944a16ba040257e811dba87b59feec",
+    "scripts/tests/test_python_sources.py": "6878f79c8ab383245fa4ca813dd6ba0eb89637e7286c629fd15210bb8f2300a8"
+  },
+  "evidence_sha256": {
+    "lua/glibc.replay.summary.json": "8e2a6ea01611416ba4a88c17a5caaec78c5f1c0017c86a026a69019d13703e1c",
+    "lua/musl.replay.summary.json": "95cdb68aae5f3b51ff49ba1dc49645034bc17398c3ab3ecec23d5f0f628e155d"
+  },
+  "raw_evidence_index": "../../raw-evidence-2026-11-17.json",
+  "limits": [
+    "Both libcs replay the prior raw capture; no new reference Linux boot or full 22-run measurement.",
+    "Local judge dependencies must be inside its directory; private copies are not a sandbox against a malicious host."
+  ]
+}

@@ -9,6 +9,7 @@ import shlex
 import sys
 
 from common import NUMBER, emit, expected, positive
+from lmbench_trace import COMMAND_INDEX
 
 names = expected('lmbench')
 labels = [r'Simple syscall', r'Simple read', r'Simple write', r'Simple stat', r'Simple fstat',
@@ -21,13 +22,6 @@ patterns = [(index, re.compile(rf'{label}:\s*({NUMBER}) microseconds'), re.compi
 patterns += [(14, re.compile(rf'File /var/tmp/XXX write bandwidth:\s*({NUMBER}) KB/sec'), re.compile(r'File /var/tmp/XXX write bandwidth:')),
              (15, re.compile(rf'Pagefaults on /var/tmp/XXX:\s*({NUMBER}) microseconds'), re.compile(r'Pagefaults on /var/tmp/XXX:')),
              (17, re.compile(rf'Pipe bandwidth:\s*({NUMBER}) MB/sec'), re.compile(r'Pipe bandwidth:'))]
-contexts = {
-    ('lat_mmap', '-P', '1', '512k', '/var/tmp/XXX'): 16,
-    ('bw_file_rd', '-P', '1', '512k', 'io_only', '/var/tmp/XXX'): 19,
-    ('bw_file_rd', '-P', '1', '512k', 'open2close', '/var/tmp/XXX'): 20,
-    ('bw_mmap_rd', '-P', '1', '512k', 'mmap_only', '/var/tmp/XXX'): 21,
-    ('bw_mmap_rd', '-P', '1', '512k', 'open2close', '/var/tmp/XXX'): 22,
-}
 found = {}
 context = None
 measured = False
@@ -71,11 +65,7 @@ for raw in sys.stdin.read().splitlines():
         except ValueError:
             continue
         if args and args[0] == './lmbench_all':
-            context = contexts.get(tuple(args[1:]))
-            if args[1:] == ['lat_fs', '/var/tmp']:
-                context = 18
-            if args[1:] == ['lat_ctx', '-P', '1', '-s', '32', '2', '4', '8', '16', '24', '32', '64', '96']:
-                context = 23
+            context = COMMAND_INDEX.get(tuple(args[1:]))
         if context in (16, 18, 19, 20, 21, 22, 23):
             start_attempt(context,traced=True)
         continue

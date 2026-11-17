@@ -1,0 +1,160 @@
+{
+  "meta": {
+    "platform": "qemu",
+    "libc": "musl",
+    "inventory": "tests/inventory.json",
+    "log": "target/evidence/pr29-review12-qemu/glibc/serial.log",
+    "capture_exit_code": null,
+    "capture_argv": null,
+    "capture_truncated": false,
+    "mode": "replay",
+    "inventory_sha256": "cfb0a44193e1a6a2ad9ce71baa300f774f25038b943458d3417f2d46f435b8e3",
+    "artifact_sha256": {
+      "/home/apollo/xyl/Contests/OS/entry/Focos-pr29-fix/target/test001/inputs/sdcard-rv.img": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+      "target/test001/review12/Image": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638",
+      "target/test001/review12/lua.cpio.gz": "18e00e17e5958037e751efb024bea61b63a597de193433c5a5e972bae32bc4da"
+    },
+    "log_sha256": "bd02d2e17a26db863908da4ae44eb58a256e58b7a20450a4bb25cb8c07c79141",
+    "environment": {
+      "status": "VALID",
+      "errors": [],
+      "script_exits": {
+        "lua-glibc": 0,
+        "lua-musl": 0
+      },
+      "incomplete": false
+    },
+    "reference_provenance": {
+      "manifest_sha256": "f81947e5b9f1f721cf87ba2def66f6b9dcdad1cbec6abbcdcb5529ad8f2855d0",
+      "build_id": "a74f8090861ee5c69a9f85bb70d6e0a69c0e8ffc21c4872e542b3e8d1c4ec7d3",
+      "inputs_pinned": true,
+      "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8"
+    },
+    "reference_command_verified": false,
+    "qemu": null,
+    "execution_valid": true,
+    "log_error": null,
+    "source_sha256": {
+      "scripts/run_tests.py": "1b1770143421f4eaf2fbe5596a88f23ac3d6818636f741e5ff1d07826f2bd665",
+      "scripts/input_snapshot.py": "eec83f8c8fe091313a59b3d32f1f94b25b7d446aafc97e3e65fca63278d2ca6c",
+      "scripts/inventory.py": "8d35642499cdf19a08768da81427793f17100469b26a4ce667272c291e1619a3",
+      "scripts/reference_protocol.py": "51913f98ff64e65334c8706805dbb8101d920880ed2e0ab77bffba1e70c7cddf",
+      "scripts/reference_manifest.py": "33923a772698ee3fbe04b97ebea74ee922d5de1f7c9ccbecdae93db29d1ebe69",
+      "scripts/lmbench_trace.py": "a910ac048653853073a7b16372a73dc844c9f9a9c878a5207166e9c937ef4c9d"
+    },
+    "judge_sha256": {
+      "scripts/judge_team/common.py": "8998c76199bd906dabe2b445a8ddbfd2a100eb1438fb5956e129d46b433c536c",
+      "scripts/judge_team/judge_cyclictest.py": "7b9cb4df7d3668005b8a84ae5e7bbd7a95cb4d6763363127f131a6c0fab01373",
+      "scripts/judge_team/judge_iperf.py": "e428516090b086101e092a5577da443b67cc9a0207d2a3ac061c4a66d972ab78",
+      "scripts/judge_team/judge_libcbench.py": "c0953579800c05096fd90b50ac0023efb9deb8078bdd2f51648794508121d708",
+      "scripts/judge_team/judge_lmbench.py": "2e4874bc427b3b179b284a407120b2b7adebeb08f52e10978525100b1c14d047",
+      "scripts/judge_team/judge_netperf.py": "6b4e67a30f974c9903cdd5b8cfdc2e51bc73b0577d64aba1d10ee692f6bdb89b",
+      "scripts/judge_team/judge_unixbench.py": "df675d3669216f81cfab908e28000d012d41d89b9289388e10460d45c8d8605e",
+      "third_party/oskernel-testsuits-cooperation/judge/judge_basic.py": "9425db752d00a0f2c8843ea2983fb605c352576309bdec5127a6bb62cbad2664",
+      "third_party/oskernel-testsuits-cooperation/judge/judge_busybox.py": "307c6d0325abe22e35c3c3cc27566b41f26598e1e690d7e2a504aadab678d03d",
+      "third_party/oskernel-testsuits-cooperation/judge/judge_iozone.py": "967cb9085fb44c08668f538e5367c70fad307d521c16d3df177ab4d124d45022",
+      "third_party/oskernel-testsuits-cooperation/judge/judge_libctest.py": "587804e2210784f17f6a4febe744dcca1b48fdb50a4dc7fb9378d62e7c711a34",
+      "third_party/oskernel-testsuits-cooperation/judge/judge_lua.py": "b07d38ab9bb12c67d1ef5c9adfcd9012671cdcb1c44f21498c9449f8e1b1634f"
+    },
+    "changed_inputs": [],
+    "replayed_at": "2026-11-17T01:48:37+00:00",
+    "replayed_from": {
+      "path": "target/evidence/pr29-review12-qemu/glibc/serial.log",
+      "sha256": "bd02d2e17a26db863908da4ae44eb58a256e58b7a20450a4bb25cb8c07c79141"
+    }
+  },
+  "totals": {
+    "subcases": 9,
+    "pass": 9,
+    "partial": 0,
+    "fail": 0,
+    "not_run": 0,
+    "groups": {
+      "PASS": 1,
+      "PARTIAL": 0,
+      "FAIL": 0,
+      "TIMEOUT": 0,
+      "NOT_RUN": 0,
+      "JUDGE_ERROR": 0
+    },
+    "pass_rate": 1.0
+  },
+  "groups": [
+    {
+      "group": "lua",
+      "libc": "musl",
+      "status": "PASS",
+      "judge_source": "official",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "lua date.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua file_io.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua max_min.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua random.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua remove.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua round_num.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua sin30.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua sort.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua strings.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        }
+      ],
+      "extras": [],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    }
+  ]
+}

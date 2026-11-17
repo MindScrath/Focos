@@ -73,6 +73,84 @@ def run(log_text: str, groups: list[str], extra: list[str] | None = None) -> tup
         return proc.returncode, summary
 
 
+class JudgeSourceRaceTests(unittest.TestCase):
+    def test_freeze_rejects_bytes_that_do_not_match_recorded_hash(self):
+        import run_tests
+        from inventory import digest
+        with tempfile.TemporaryDirectory() as tmp:
+            script=Path(tmp)/'judge.py';script.write_text('print("old")\n')
+            expected={str(script):digest(script)}
+            script.write_text('print("new")\n')
+            with self.assertRaisesRegex(ValueError,'changed while freezing'):
+                run_tests.freeze_judge_sources({script},expected)
+
+    def test_directory_switch_during_child_open_cannot_replace_executed_source(self):
+        import contextlib, io, run_tests
+        from unittest.mock import patch
+        from inventory import load_inventory, digest
+        names=load_inventory()['groups']['iperf']['subcases']
+        for dependency in ['script','helper','package']:
+            with self.subTest(dependency=dependency), tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);original=root/'original';other=root/'other'
+                original.mkdir();other.mkdir();alias=root/'alias';alias.symlink_to(original,target_is_directory=True)
+                rows=lambda passed: repr([{'name':name,'all':1,'pass':passed,'score':passed} for name in names])
+                for directory,passed in [(original,0),(other,1)]:
+                    if dependency=='script':
+                        (directory/'judge_iperf.py').write_text('import json\nprint(json.dumps('+rows(passed)+'))\n')
+                    else:
+                        helper=directory/'helper.py';statement='from helper import rows'
+                        if dependency=='package':
+                            (directory/'pkg').mkdir();(directory/'pkg/__init__.py').write_text('')
+                            helper=directory/'pkg/helper.py';statement='from pkg.helper import rows'
+                        helper.write_text('rows = '+rows(passed)+'\n')
+                        (directory/'judge_iperf.py').write_text(statement+'\nimport json\nprint(json.dumps(rows))\n')
+                log=root/'input.log';log.write_text('#### OS COMP TEST GROUP START iperf-musl ####\n#### OS COMP TEST GROUP END iperf-musl ####\n')
+                expected=digest(alias/'judge_iperf.py');real_run=subprocess.run
+                def launch(*args,**kwargs):
+                    alias.unlink();alias.symlink_to(other,target_is_directory=True)
+                    try: return real_run(*args,**kwargs)
+                    finally:
+                        alias.unlink();alias.symlink_to(original,target_is_directory=True)
+                with patch.object(run_tests.subprocess,'run',side_effect=launch),contextlib.redirect_stdout(io.StringIO()):
+                    code=run_tests.main(['--log',str(log),'--out',str(root/'out'),'--libc','musl','--group','iperf',
+                                         '--inventory',str(INVENTORY),'--team-judge-dir',str(alias)])
+                data=json.loads((root/'out/summary.json').read_text())
+                self.assertEqual(code,1)
+                self.assertTrue(data['meta']['execution_valid'])
+                self.assertEqual(data['totals']['pass'],0)
+                self.assertEqual(data['meta']['judge_sha256'][str(alias/'judge_iperf.py')],expected)
+                if dependency=='package':
+                    self.assertIn(str(alias/'pkg/helper.py'),data['meta']['judge_sha256'])
+
+    def test_lmbench_unknown_trace_is_normalized_without_changing_known_denominator(self):
+        import run_tests
+        from inventory import load_inventory
+        from unittest.mock import patch
+        cfg=load_inventory()['groups']['lmbench'];names=cfg['subcases']
+        rows=[{'name':name,'all':1,'pass':1,'score':1} for name in names]
+        for trace in ['+ ./lmbench_all lat_new -P 1',"+ ./lmbench_all 'lat_new'  -P  1"]:
+            with self.subTest(trace=trace),patch.object(run_tests,'run_judge',return_value=run_tests.JudgeResult(rows,'ok')):
+                result=run_tests.judge_group('lmbench',run_tests.Section('lmbench','musl',[trace]),cfg,Path('.'),TEAM_DIR,5)
+            self.assertEqual(result['unexpected_in_log'],['lmbench lat_new -P 1'])
+            self.assertEqual(len(result['subcases']),24)
+            self.assertEqual(result['status'],'PASS')
+
+    def test_lmbench_frozen_traces_and_malformed_commands(self):
+        import shlex
+        from lmbench_trace import COMMANDS, COMMAND_INDEX, logged_names
+        from inventory import load_inventory
+        names=load_inventory()['groups']['lmbench']['subcases']
+        self.assertEqual(len(COMMANDS),24)
+        self.assertEqual(COMMAND_INDEX[('lat_fs','/var/tmp')],18)
+        self.assertEqual(COMMAND_INDEX[('bw_pipe','-P','1')],17)
+        for index,command in enumerate(COMMANDS):
+            self.assertEqual(logged_names('+ ./lmbench_all '+shlex.join(command),names),{names[index]})
+        self.assertEqual(logged_names('+ ./busybox echo ok',names),set())
+        self.assertEqual(logged_names('+ ./lmbench_all lat_mmap -P 2 512k /var/tmp/XXX',names),
+                         {'lmbench lat_mmap -P 2 512k /var/tmp/XXX'})
+        self.assertTrue(next(iter(logged_names("+ ./lmbench_all 'broken",names))).startswith('lmbench malformed-trace '))
+
+
 class RunnerContractTests(unittest.TestCase):
     def test_empty_log_marks_all_not_run(self):
         code, summary = run("", ["basic", "iperf"])

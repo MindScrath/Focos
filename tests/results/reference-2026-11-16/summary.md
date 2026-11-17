@@ -97,3 +97,5 @@ CI 补充：Ubuntu dash 的 echo 会展开测试桩命令中的反斜杠，现�
 构建输出和 runner 受管输出两两检查路径/inode 冲突，含启动后新建硬链接；已知截断优先于 judge 错误，诊断仍保留，并将 execution_valid 标为 false。新增测试先在旧实现暴露 25 个失败断言，另以 3 个失败断言暴露截断有效性标记遗漏。修复后 78 项专项、52 Rust、15 原有 Python、三个内核 QEMU 检查与 15 份历史回放通过。
 
 同源同输入在不同目录/文件名下重建，内核、initramfs 与完整 manifest 一致。实际 QEMU 新采集 Lua glibc 9/9；musl 从同一双 libc 串口回放为 9/9，不算第二次启动，也没有重跑完整 22 次测量。详见 [结构化验证](payload-binding.json) 与 schema2-lua/ 下原始日志、构建 manifest、采集摘要和回放摘要。其哈希在结构化验证中；旧 Release 未覆盖。
+
+原始 serial.log 已转存外部固定哈希归档；本目录摘要与 validation 的原始哈希保留。下载位置、逐文件路径与校验值统一见 [原始证据索引](../raw-evidence-2026-11-17.json)。库内不再保存含上游版权邮箱的日志，旧判分和原始字节不修改。

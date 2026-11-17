@@ -108,6 +108,7 @@ Focos/
 │   ├── test_irq_api.py                # 启动自检 unsafe 边界的调用方编译测试
 │   ├── test_smoke.py                  # 启动检查器标记、退出状态与超时测试
 │   ├── inventory.py                   # 冻结输入的共用读取、校验与哈希
+│   ├── lmbench_trace.py               # 冻结 lmbench 命令映射与未知 trace 名称
 │   ├── input_snapshot.py              # 构件哈希去重、路径绑定与分层变化检查
 │   ├── sync_test_plan.py              # 从清单生成区域计划与文档表格
 │   ├── run_tests.py                   # 串口切组、判分、原始日志与结果
@@ -139,6 +140,7 @@ Focos/
 │   ├── reference.lock.json            # 当前/历史参考内核与证据归档的固定输入
 │   ├── reference-replay-updates.json  # 与固定历史归档绑定的两处未知名称诊断增补
 │   ├── results/                       # TEST-001 参考运行摘要
+│   │   ├── raw-evidence-2026-11-17.json # 外部原始串口归档、逐文件哈希与来源
 │   │   ├── reference-2026-11-08/       # 原始历史基线
 │   │   │   └── summary.md             # 旧镜像差异与参考结果
 │   │   ├── reference-2026-11-16/       # 验证链重构后的独立测量
@@ -148,22 +150,26 @@ Focos/
 │   │   │   ├── disk-binding.json       # strict 磁盘绑定及输出别名的修复证据
 │   │   │   ├── runtime-identity.json   # QEMU 身份、构建快照及回放时间证据
 │   │   │   ├── payload-binding.json       # schema 2 内容身份、双构建与回归验证
-│   │   │   └── schema2-lua/             # 新协议原始串口、manifest 与采集/回放摘要
+│   │   │   └── schema2-lua/             # 新协议 manifest 与摘要；原始串口见外部索引
 │   │   └── review-2026-11-17/           # 后续审核边界修复与历史诊断差异
 │   │       ├── summary.md             # 问题分析、验证结果与限制
 │   │       ├── validation.json        # 逐份历史对照、严格回放及源码哈希
 │   │       ├── preflight/             # 后续 strict 构件预检、来源字段与有界哈希验证
 │   │       │   ├── summary.md         # 问题分析、检查与性能计数的边界
 │   │       │   ├── validation.json    # 当前源码哈希、读取次数与结果对照
-│   │       │   └── lua/               # 本轮 manifest、原始串口及采集/回放摘要
+│   │       │   └── lua/               # 本轮 manifest 与摘要；原始串口见外部索引
 │   │       ├── ownership/             # 状态归并、输入来源与不可覆盖发布
 │   │       │   ├── summary.md         # 多轮遗漏根因、约束与并发验证
 │   │       │   ├── validation.json    # 组合/竞争测试及最终运行证据哈希
-│   │       │   └── lua/               # 最终 manifest、串口及采集/回放摘要
-│   │       └── startup/               # Python 缓存隔离与 strict 必填参数
-│   │           ├── summary.md         # 后续评审发现与补充修复
-│   │           ├── validation.json    # 缓存投毒/参数组合及实际运行校验值
-│   │           └── lua/               # 最终 manifest、原始串口及采集/回放摘要
+│   │       │   └── lua/               # 最终 manifest 与摘要；原始串口见外部索引
+│   │       ├── startup/               # Python 缓存隔离与 strict 必填参数
+│   │       │   ├── summary.md         # 后续评审发现与补充修复
+│   │       │   ├── validation.json    # 缓存投毒/参数组合及实际运行校验值
+│   │       │   └── lua/               # 最终 manifest 与摘要；原始串口见外部索引
+│   │       └── judges/                # 判据字节快照、trace 与外部证据验证
+│   │           ├── summary.md         # 根因、回归及证据归档使用
+│   │           ├── validation.json    # 测试与当前执行源码校验值
+│   │           └── lua/               # 当前 runner 对既有原始采集的严格回放摘要
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南

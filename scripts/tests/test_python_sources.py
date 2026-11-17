@@ -59,7 +59,7 @@ class PythonSourceTests(unittest.TestCase):
 
     def test_successful_runner_records_the_source_that_actually_executed(self):
         modes=[py_compile.PycInvalidationMode.TIMESTAMP,py_compile.PycInvalidationMode.UNCHECKED_HASH]
-        for module in ['inventory.py','input_snapshot.py','reference_protocol.py','reference_manifest.py']:
+        for module in ['inventory.py','input_snapshot.py','reference_protocol.py','reference_manifest.py','lmbench_trace.py']:
             for mode in modes:
                 with self.subTest(module=module,mode=mode):
                     root=self.fixture();marker,expected=self.poison(root,module,mode)

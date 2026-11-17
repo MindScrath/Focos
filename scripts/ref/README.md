@@ -156,3 +156,20 @@ APK 在同一字节快照上校验并解包；kernel/module 字节只在内存�
 显式 --reference strict 在采集/回放入口统一要求 --reference-manifest、--reference-artifacts KERNEL INITRAMFS、--reference-image；任一缺失即退出 2，在读取日志、探测 QEMU 和判分前停止。自动检测到未经验证的参考日志仍不会成为有效通过。
 
 后续缓存/参数复现和实际启动见 [startup 验证](../../tests/results/review-2026-11-17/startup/summary.md)。
+
+## 判据快照与原始串口归档
+
+runner 在采集/回放前冻结 judge 目录的全部普通文件（含包内 helper 和数据，排除 pyc 缓存），连同共用 inventory.py、lmbench_trace.py、清单和锁，核对记录的 SHA256。子进程在私有目录执行这些字节的只读副本，并移除继承的 PYTHONPATH；保留原始路径的变化监视。因此原 judge 目录在子进程打开时临时切换再恢复，也不能改变实际判分代码。自定义 judge 的本地依赖须放在该目录内；不支持从目录外动态导入未登记的项目依赖，运行环境不作为对恶意主机的沙箱。
+
+lmbench 的 24 条冻结命令共用同一映射；未知命令按 shell 参数解析后规范化到 unexpected_in_log，改参数、空命令或坏引号都不能静默丢失；不改变 24 项分母。
+
+四份新增原始串口含上游内核版权邮箱，已从代码树转存到 [固定外部归档](https://github.com/ApolloMonasa/Focos-contrib/releases/tag/test-001-pr29-raw-2026-11-17)。原始字节和所有已有摘要哈希不变，逐文件路径、SHA256 与归档 SHA256 见 [索引](../../tests/results/raw-evidence-2026-11-17.json)。下载、核对归档哈希后，在独立目录展开即可使用索引中的相对路径回放：
+
+```sh
+gh release download test-001-pr29-raw-2026-11-17 --repo ApolloMonasa/Focos-contrib --pattern '*.tar.gz' --dir target/raw-evidence
+sha256sum target/raw-evidence/test-001-pr29-raw-2026-11-17.tar.gz
+# 应为 317dc3548149b903166037ab80960a1c7680da43966f776e69479124f990ed53
+tar -xzf target/raw-evidence/test-001-pr29-raw-2026-11-17.tar.gz -C target/raw-evidence
+```
+
+按归档 SOURCE.json 核对每份文件 SHA256；manifest/摘要仍在仓库原路径。后续判据快照回归与当前 runner 对既有原始采集的严格回放见 [judges 验证](../../tests/results/review-2026-11-17/judges/summary.md)。

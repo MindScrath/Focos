@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "archive_url": "https://github.com/ApolloMonasa/Focos-contrib/releases/download/test-001-pr29-raw-2026-11-17/test-001-pr29-raw-2026-11-17.tar.gz",
+  "archive_sha256": "317dc3548149b903166037ab80960a1c7680da43966f776e69479124f990ed53",
+  "source_commit": "32f69331b1bcfb6c2be68ee8eefb72f960305fae",
+  "files": {
+    "tests/results/reference-2026-11-16/schema2-lua/serial.log": "ec5db4339ee2576c276dbe760c7000106138231f394cc988be2bd780cb4d1019",
+    "tests/results/review-2026-11-17/preflight/lua/serial.log": "8c17c1b90c4758fb6192114a7afa1a58822a0dd127791f4c6f5809b7c8237b3c",
+    "tests/results/review-2026-11-17/ownership/lua/serial.log": "06a9db6ff3d84e41db152d5cab28bf360e7391b1b21f7321507fe1f27ba4995d",
+    "tests/results/review-2026-11-17/startup/lua/serial.log": "bd02d2e17a26db863908da4ae44eb58a256e58b7a20450a4bb25cb8c07c79141"
+  }
+}

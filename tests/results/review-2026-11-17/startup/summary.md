@@ -13,3 +13,5 @@ strict 的 manifest、kernel/initramfs 与 image 三组参数统一在读取日�
 原始串口、manifest 和采集/回放摘要位于 lua/，哈希见 [validation.json](validation.json)。本轮跟进另留存这一次参考启动，旧 ownership/preflight/历史证据不覆盖，未重跑 22 次测量。常规支持入口为文档中的 CPython 文件 CLI；嵌入式 Python 调用须在首次项目导入前自行建立相同隔离条件。
 
 Python 官方语义：[命令行 -B](https://docs.python.org/3/using/cmdline.html#cmdoption-B)、[sys.pycache_prefix](https://docs.python.org/3/library/sys.html#sys.pycache_prefix)。缓存隔离补齐了已复现的启动条件，不构成任意解释器环境或源码并发修改的密码学证明。
+
+原始 serial.log 已转存外部固定哈希归档；本目录摘要与 validation 的原始哈希保留。下载位置、逐文件路径与校验值统一见 [原始证据索引](../../raw-evidence-2026-11-17.json)。库内不再保存含上游版权邮箱的日志，旧判分和原始字节不修改。

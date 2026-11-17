@@ -38,6 +38,7 @@ sys.dont_write_bytecode = True
 from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK
 from reference_protocol import validate_reference
 from input_snapshot import InputSnapshot
+from lmbench_trace import logged_names as lmbench_logged_names
 from reference_manifest import load_manifest, verify_reference_inputs, verify_reference_log, strict_qemu_command, qemu_identity
 
 GROUP_RE = re.compile(r"^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$")
@@ -102,21 +103,59 @@ def split_sections(log_text: str, default_libc: str) -> dict[tuple[str, str], Se
     return sections
 
 
-def run_judge(judge_path: Path, section_text: str, timeout: int) -> JudgeResult:
-    if not judge_path.exists():
+def judge_files(directory):
+    return {p for p in directory.rglob('*') if p.is_file() and
+            '__pycache__' not in p.parts and p.suffix not in ('.pyc', '.pyo')}
+
+
+def freeze_judge_sources(paths, expected):
+    frozen = {}
+    for path in paths:
+        if not path.is_file():
+            continue
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != expected.get(str(path)):
+            raise ValueError('judge source changed while freezing: '+str(path))
+        frozen[path.absolute()] = raw
+    return frozen
+
+
+def run_judge(judge_path: Path, section_text: str, timeout: int, *, sources=None) -> JudgeResult:
+    judge_path = judge_path.absolute()
+    if sources is None:
+        try:
+            paths = judge_files(judge_path.parent) | {ROOT/'scripts/inventory.py', ROOT/'scripts/lmbench_trace.py', INVENTORY, REFERENCE_LOCK}
+            sources = {p.absolute():p.read_bytes() for p in paths}
+        except OSError as exc:
+            return JudgeResult([], 'error', f'judge snapshot failed: {exc}')
+    if judge_path not in sources:
         return JudgeResult([], "missing", f"judge not found: {judge_path}")
     if judge_path.suffix == ".sh":
         return JudgeResult([], "unsupported", f"shell judge is not a stdin parser: {judge_path}")
     try:
-        with tempfile.TemporaryDirectory(prefix='focos-judge-cache-') as cache:
+        with tempfile.TemporaryDirectory(prefix='focos-judge-source-') as private:
+            root = Path(private)
+            directory = root/'scripts/judge_team'
+            payload = {directory/p.relative_to(judge_path.parent):raw for p,raw in sources.items()
+                       if p.is_relative_to(judge_path.parent)}
+            for relative in ('scripts/inventory.py','scripts/lmbench_trace.py','tests/inventory.json','tests/reference.lock.json'):
+                if ROOT/relative in sources:
+                    payload[root/relative] = sources[ROOT/relative]
+            for path,raw in payload.items():
+                path.parent.mkdir(parents=True,exist_ok=True)
+                path.write_bytes(raw)
+                path.chmod(0o444)
+            env = dict(os.environ)
+            env.pop('PYTHONPATH',None)
             proc = subprocess.run(
-                [sys.executable, '-B', '-X', 'pycache_prefix='+cache, str(judge_path)],
+                [sys.executable, '-B', '-X', 'pycache_prefix='+str(root/'cache'), str(directory/judge_path.name)],
                 input=section_text,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
                 capture_output=True,
                 timeout=timeout,
+                env=env,
             )
     except subprocess.TimeoutExpired:
         return JudgeResult([], "timeout", f"judge timed out after {timeout}s")
@@ -175,6 +214,7 @@ def judge_group(
     team_dir: Path,
     judge_timeout: int,
     official_hashes: dict | None = None,
+    judge_sources: dict | None = None,
 ) -> dict:
     expected = list(cfg.get("subcases", []))
     mode = cfg.get("mode", "pass_fail")
@@ -206,6 +246,8 @@ def judge_group(
             logged.update('lua '+name for name in re.findall(r'^testcase[ \t]+lua[ \t]+(\S+)[ \t]+\S+[ \t]*$',section.text,re.M))
         elif group == 'busybox':
             logged.update(name.strip() for name in re.findall(r'^testcase[ \t]+(.+?)[ \t]+\S+[ \t]*$',section.text,re.M))
+        elif group == 'lmbench':
+            logged.update(lmbench_logged_names(section.text,expected))
         if group == "libctest":
             normalized = set()
             for name in logged:
@@ -231,10 +273,12 @@ def judge_group(
     else:
         judge_path = team_dir / Path(judge_file).name
 
-    if cfg.get('kind') == 'official' and official_hashes is not None and judge_path.exists() and digest(judge_path) != official_hashes.get(judge_path.name):
+    frozen = judge_sources.get(judge_path.absolute()) if judge_sources is not None else None
+    actual_hash = hashlib.sha256(frozen).hexdigest() if frozen is not None else (digest(judge_path) if judge_path.is_file() else None)
+    if cfg.get('kind') == 'official' and official_hashes is not None and actual_hash is not None and actual_hash != official_hashes.get(judge_path.name):
         judged = JudgeResult([], 'error', 'official judge hash mismatch')
     else:
-        judged = run_judge(judge_path, section.text, judge_timeout)
+        judged = run_judge(judge_path, section.text, judge_timeout, sources=judge_sources) if judge_sources is not None else run_judge(judge_path, section.text, judge_timeout)
     result["judge_source"] = cfg.get("kind", "unknown")
     def judge_error(message):
         result['status'] = 'TIMEOUT' if section.truncated else 'JUDGE_ERROR'
@@ -412,7 +456,7 @@ def main(argv: list[str] | None = None) -> int:
     # Python 已加载的实现必须先固定身份，不能等耗时的大构件哈希后才读源码版本。
     source_hashes = {str(p.relative_to(ROOT)): snapshot.digest(p) for p in
                     [Path(__file__).resolve(), ROOT/'scripts/input_snapshot.py', ROOT/'scripts/inventory.py',
-                     ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']}
+                     ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py', ROOT/'scripts/lmbench_trace.py']}
 
     out_dir = Path(args.out)
     sections_dir = out_dir/'sections'
@@ -496,7 +540,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # 在执行外部命令前固定源码身份，长时间运行期间的编辑不能改写这次执行的来源。
     # 所有会影响判分的文件在采集前登记；缺失文件也登记，防止中途补入。
-    judge_paths = set(Path(args.judge_dir).glob('judge_*.py')) | set(Path(args.team_judge_dir).glob('*.py'))
+    judge_paths = judge_files(Path(args.judge_dir)) | judge_files(Path(args.team_judge_dir))
     for group in selected:
         cfg = groups_cfg[group]
         directory = Path(args.judge_dir) if cfg['kind'] == 'official' else Path(args.team_judge_dir)
@@ -510,6 +554,13 @@ def main(argv: list[str] | None = None) -> int:
         snapshot.watch(p,sha,bulk=True)
     for p in {inventory_path, INVENTORY, REFERENCE_LOCK}:
         snapshot.watch(p,inventory_hash if p == inventory_path else snapshot.digest(p))
+    try:
+        execution_paths = judge_paths | {ROOT/'scripts/inventory.py', ROOT/'scripts/lmbench_trace.py', INVENTORY, REFERENCE_LOCK}
+        execution_hashes = {str(p):snapshot.digest(p) for p in execution_paths if p.is_file()}
+        judge_sources = freeze_judge_sources(execution_paths,execution_hashes)
+    except (ValueError,OSError) as exc:
+        print(f'invalid judge sources: {exc}',file=sys.stderr)
+        return 2
     if args.reference_manifest:
         snapshot.watch(args.reference_manifest,manifest_hash)
     if isinstance(capture_command,list):
@@ -594,6 +645,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.team_judge_dir),
             args.judge_timeout,
             inventory['judge']['files'],
+            judge_sources,
         )
         results.append(result)
 
