@@ -66,7 +66,7 @@ for raw in sys.stdin.read().splitlines():
             continue
         if args and args[0] == './lmbench_all':
             context = COMMAND_INDEX.get(tuple(args[1:]))
-        if context in (16, 18, 19, 20, 21, 22, 23):
+        if context is not None:
             start_attempt(context,traced=True)
         continue
     if line in ('file system latency','context switch overhead'):
@@ -83,7 +83,7 @@ for raw in sys.stdin.read().splitlines():
     for index, pattern, prefix in patterns:
         match = pattern.fullmatch(line)
         if prefix.match(line):
-            found.setdefault(names[index], []).append(bool(match and positive(match[1])))
+            observe(index, bool(match and positive(match[1])))
             matched = True
             break
     if matched:

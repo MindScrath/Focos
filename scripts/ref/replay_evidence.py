@@ -131,18 +131,32 @@ def unpack(archive, destination, expected_hash):
     return destination/'test-001-evidence-2026-11-08'
 
 
+def execution_sources(judge_dir):
+    paths = {Path(__file__).resolve(), REFERENCE_LOCK, INVENTORY, REPLAY_UPDATES}
+    paths.update((ROOT/'scripts').glob('*.py'))
+    for directory in (ROOT/'scripts/judge_team', judge_dir):
+        paths.update(p for p in directory.rglob('*') if p.is_file() and
+                     '__pycache__' not in p.parts and p.suffix not in ('.pyc','.pyo'))
+    return paths
+
+
+def verify_sources(judge_dir, watched):
+    if execution_sources(judge_dir) != set(watched) or any(
+            not path.is_file() or digest(path) != sha for path,sha in watched.items()):
+        raise ValueError('replay source/config changed during run')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--out', type=Path, default=ROOT/'target/test001/replay')
     parser.add_argument('--judge-dir', type=Path, default=ROOT/'third_party/oskernel-testsuits-cooperation/judge')
     args = parser.parse_args(argv)
-    watched={path:digest(path) for path in (Path(__file__).resolve(),ROOT/'scripts/run_tests.py',REFERENCE_LOCK,INVENTORY,REPLAY_UPDATES)}
+    watched={path:digest(path) for path in execution_sources(args.judge_dir)}
     lock = json.loads(REFERENCE_LOCK.read_text())['evidence']
     updates=load_updates(REPLAY_UPDATES.read_bytes(),lock['sha256'])
     def unchanged():
-        if any(not path.is_file() or digest(path) != sha for path,sha in watched.items()):
-            raise ValueError('replay source/config changed during run')
+        verify_sources(args.judge_dir, watched)
     reject_symlinks(args.out)
     reject_symlinks(args.out/'replay.json')
     args.out.mkdir(parents=True, exist_ok=True)
@@ -191,7 +205,16 @@ def main(argv=None):
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if proc.returncode not in (0, 1) or not summary_path.is_file():
             raise ValueError(f'replay failed: {path.parent.name}: {proc.stderr}')
+        unchanged()
         current = json.loads(summary_path.read_text())
+        # 子进程报告的实际源码/判据也必须属于整轮启动前的版本。
+        for field in ('source_sha256', 'judge_sha256'):
+            for name, sha in current['meta'].get(field, {}).items():
+                source = Path(name)
+                source = source if source.is_absolute() else ROOT/source
+                expected = next((value for path,value in watched.items() if path.absolute()==source.absolute()), None)
+                if expected != sha:
+                    raise ValueError('child replay used a different source version: '+name)
         expected_totals = {k: v for k, v in original['totals'].items() if k != 'score'}
         expected=expected_groups(path.parent.name,original['groups'],updates)
         applied=[item for item in updates if item['sample']==path.parent.name]

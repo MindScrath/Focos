@@ -229,3 +229,18 @@ class InputTests(unittest.TestCase):
             with self.assertRaises(ValueError):load_updates(path.read_bytes(),'b'*64)
             changed=copy.deepcopy(old);changed[0]['unexpected_in_log']=['already different']
             with self.assertRaises(ValueError):expected_groups('sample',changed,updates)
+
+    def test_replay_source_set_includes_all_dependencies_and_nested_judges(self):
+        from ref import replay_evidence as replay
+        with tempfile.TemporaryDirectory() as tmp:
+            judges=Path(tmp);(judges/'pkg').mkdir();helper=judges/'pkg/helper.py';helper.write_text('x=1')
+            paths=replay.execution_sources(judges)
+            self.assertIn(helper,paths)
+            for name in ['input_snapshot.py','reference_protocol.py','reference_manifest.py','lmbench_trace.py','inventory.py']:
+                self.assertIn(ROOT/'scripts'/name,paths)
+            self.assertIn(ROOT/'scripts/judge_team/common.py',paths)
+            before={p:replay.digest(p) for p in paths}
+            helper.write_text('x=2')
+            with self.assertRaises(ValueError):replay.verify_sources(judges,before)
+            helper.write_text('x=1');(judges/'new.py').write_text('x=1')
+            with self.assertRaises(ValueError):replay.verify_sources(judges,before)

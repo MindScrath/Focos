@@ -132,3 +132,16 @@ class JudgeTests(unittest.TestCase):
             for prefix in [header,trace,trace+'\n'+header]:
                 with self.subTest(prefix=prefix):
                     self.assertEqual(judge('lmbench',prefix+'\n'+intermediate+'\n'+good+'\n')[index]['pass'],1)
+
+    def test_labeled_trace_missing_attempt_cannot_be_retried_into_pass(self):
+        import shlex
+        from lmbench_trace import COMMANDS
+        labels=['Simple syscall','Simple read','Simple write','Simple stat','Simple fstat','Simple open/close',"Select on 100 fd's",'Signal handler installation','Signal handler overhead','Protection fault','Pipe latency','Process fork+exit','Process fork+execve','Process fork+/bin/sh -c']
+        results=[label+': 1.2 microseconds' for label in labels]+['File /var/tmp/XXX write bandwidth: 123 KB/sec','Pagefaults on /var/tmp/XXX: 1.2 microseconds']
+        cases=[(shlex.join(COMMANDS[i]),result,i) for i,result in enumerate(results)]
+        cases.append((shlex.join(COMMANDS[17]),'Pipe bandwidth: 123 MB/sec',17))
+        for command,result,index in cases:
+            trace='+ ./lmbench_all '+command+'\n'
+            with self.subTest(command=command):
+                self.assertEqual(judge('lmbench',trace+result+'\n')[index]['pass'],1)
+                self.assertEqual(judge('lmbench',trace+trace+result+'\n')[index]['pass'],0)

@@ -17,12 +17,12 @@
 - **环境准备**：所有必需的模块、挂载、目录、链接、权限、配置、网络及 chroot 预检失败，输出 `REF_FAIL <stage>` 并停止，不执行后续组。测试脚本非零退出单独记录，不冒充环境失败或成功。
 - **组切分**：严格配对 `#### OS COMP TEST GROUP START/END <group>-<libc> ####`；不带后缀时用必填的 `--libc`。重复、嵌套、错配标记是 `LOG_ERROR`，禁止选择一段覆盖其他段；EOF 前未结束是 `TIMEOUT`。
 - **判分**：启动采集/回放前，把 judge 目录内的源文件、包内 helper、数据及共用清单依赖冻结为已校验字节；子进程只执行私有副本，不按原路径重开。副本只读且隔离 PYTHONPATH/pycache；原始文件仍监视变化。固定官方或团队 Python judge 用 stdin 接收组段，stdout 返回 JSON 列表；不设 fallback。非法字段、重复名字、非有限数值、非法计数、崩溃、超时均为 `JUDGE_ERROR`。官方 `total` 兼容为 `all`；iozone 按有效正 `result` 判完成。
-- **判据**：lmbench 每次命令或无 trace 表头先预留失败观测；trace 后首个表头不重复计数，缺失尝试不能被后续重试覆盖。团队性能解析器只接受约定格式、单位和有效数值。错误消息中的关键词、数字、耗时或部分输出不构成成功。重复/冲突结果不能用后一次成功覆盖失败。
+- **判据**：lmbench 每条冻结命令（含带标签指标）或无 trace 表头先预留失败观测，带标签结果消费对应预留项；trace 后首个表头不重复计数，缺失尝试不能被后续重试覆盖。团队性能解析器只接受约定格式、单位和有效数值。错误消息中的关键词、数字、耗时或部分输出不构成成功。重复/冲突结果不能用后一次成功覆盖失败。
 - **状态**：`PASS` 仅限清单内每项 `pass == all > 0`；部分断言通过为 `PARTIAL`，无通过为 `FAIL`。缺组为 `NOT_RUN`，缺项为 `MISSING`（0 分）。另列 `TIMEOUT`、`JUDGE_ERROR`、`LOG_ERROR`、`ENV_ERROR`、`CAPTURE_ERROR`；这些均不能通过。状态统一归并：明确环境/来源错误优先；capture 超时或段 EOF 截断优先于协议未完成、非零 capture 退出及判分器错误；结构错误优先于 capture 退出。合法协议前缀未完成保留诊断且 execution_valid 为 false，错误 ID/顺序及 REF_FAIL 仍失效。退出码和 judge_error 不丢失。脚本非零退出不得覆盖 JUDGE_ERROR 等不可判分状态。
 - **参考协议**：新 init 输出版本、准备、运行及退出码标记；严格模式必须提供 manifest 与内核/initramfs，另须提供实际磁盘 --reference-image 并核对其 SHA256；capture 命令的 kernel/initrd/drive 必须与声明一致，仅允许直接 QEMU argv；实际可执行文件经 PATH 解析、规范化，记录版本探测输出与哈希并监视文件变化。核对构建 ID、冻结输入、构件哈希、顺序与所选组；环境错误使结果失效。旧日志只能显式使用 legacy 模式，标记环境未经新协议验证；不据此声称新构建通过。详见[参考运行说明](../scripts/ref/README.md)。
 - **输出**：`summary.json`、`summary.md`、原始 `serial.log`、`sections/<group>-<libc>.log`；额外 judge 名称与未知用例另列（含 iperf/netperf/cyclictest 结束标记、Unixbench 结果名、libc-bench 标签以及 Lua/busybox testcase 行和 lmbench trace 命令），不进入分母。每项保留 `name/status/all/pass/score`，不同单位的分数不汇总。采集使用 mode=capture/captured_at；日志回放使用 mode=replay/replayed_at/replayed_from，不伪造采集时间。
 - **构建身份**：严格模式使用 schema 2 manifest，构建器、inventory/manifest 实现及 BusyBox 的 SHA256 四字段必填；BusyBox 还须匹配归档内容。嵌入式 ID 绑定实际内核及 initramfs 全部解压内容，只将 /init 内唯一的 ID 字段归零以解除自引用。校验时从实际归档重算，拒绝重名、路径别名、硬链接、截断和尾随归档。改写 manifest 的输出哈希不能为旧日志换配新构件。schema 1 不作为严格证据。
-- **历史证据**：含邮箱的原始串口放在固定哈希外部归档，库内保留路径、逐文件哈希和归档索引，判分摘要仍绑定原始字节。隔离解包并校验全部文件后发布，拒绝目标及祖先符号链接；已有不同内容不覆盖。每次回放须生成新摘要。诊断增补绑定固定归档、样本、组和精确前后值，只允许 unexpected_in_log；不允许改状态、分数、通过数，其他差异使检查失败。
+- **历史证据**：整轮回放固定全部 runner/判据依赖集合与哈希，各子回放前后检查，子摘要执行哈希须与整轮一致；含邮箱的原始串口放在固定哈希外部归档，库内保留路径、逐文件哈希和归档索引，判分摘要仍绑定原始字节。隔离解包并校验全部文件后发布，拒绝目标及祖先符号链接；已有不同内容不覆盖。每次回放须生成新摘要。诊断增补绑定固定归档、样本、组和精确前后值，只允许 unexpected_in_log；不允许改状态、分数、通过数，其他差异使检查失败。
 - **退出码**：显式 strict 的 manifest、内核/initramfs、image 任一缺失时，读取日志前退出 2。显式 manifest 的结构、来源字段、冻结输入、选择和实际内核/initramfs 内容在采集/回放前统一校验；非法或不匹配退出 2，先于 QEMU 版本探测、采集与判分。0 = 所选组全部通过且运行有效；1 = 非通过或运行无效；2 = 参数、文件或清单错误。捕获命令非零退出不得报告通过；超时终止整个子进程组。
 
 ## 怎样验收
