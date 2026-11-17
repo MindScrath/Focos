@@ -170,6 +170,7 @@ Focos/
 │   │           ├── summary.md         # 根因、回归及证据归档使用
 │   │           ├── validation.json    # 测试与当前执行源码校验值
 │   │           ├── round14.json       # 全命令尝试记录与整轮回放来源修复
+│   │           ├── round15.json       # 官方依赖、manifest 模式与输出硬链接修复
 │   │           └── lua/               # 当前 runner 对既有原始采集的严格回放摘要
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交

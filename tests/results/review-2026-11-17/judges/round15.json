@@ -1,0 +1,22 @@
+{
+  "checks": {
+    "test001": 124,
+    "rust": 52,
+    "existing_python": 15,
+    "qemu": [
+      "BOOT-001",
+      "MM-002",
+      "ARCH-001"
+    ]
+  },
+  "old_failures": 7,
+  "historical_samples": 15,
+  "all_expected_match": true,
+  "source_sha256": {
+    "scripts/run_tests.py": "dbd9b9dd564615ead5eeb33120ae19b04b829dc75c55a3a71b5217709d307a93",
+    "scripts/inventory.py": "1650c6371345260eb04e49c3e84887ef6b7c103e7f1e15c1554b0fe39ed741ee",
+    "scripts/fetch_judges.py": "19ae36fbf6c2e01cfa3fe5125d784f2c435b9370dc1af32244c8316f2f326906",
+    "scripts/tests/test_inputs.py": "d8dc2d6b23f16196bf859e45337ac8dcc4cfe73e74e3a048cc4a77350ef84f24",
+    "scripts/tests/test_runner.py": "0798baa722adc4e0a2ab075214b36813cd3234d7727baff23343cb4154f647c9"
+  }
+}

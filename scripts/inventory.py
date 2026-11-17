@@ -57,3 +57,14 @@ def load_inventory(path: Path = INVENTORY, *, raw: bytes | None = None) -> dict:
     if not isinstance(image, dict) or any(not isinstance(image.get(k), str) or not re.fullmatch(r'[0-9a-f]{64}', image[k]) for k in ('published_compressed_sha256', 'uncompressed_sha256')):
         raise ValueError('invalid frozen image hashes')
     return data
+
+
+def validate_official_directory(directory, names):
+    """官方脚本不声明本地依赖；拒绝能遮蔽标准库的额外目录/文件。"""
+    if not directory.exists():
+        return
+    for path in directory.iterdir():
+        if path.name == '__pycache__' and path.is_dir() and not path.is_symlink():
+            continue
+        if path.name not in names or not path.is_file() or path.is_symlink():
+            raise ValueError('unfixed official judge dependency: '+str(path))

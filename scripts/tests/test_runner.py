@@ -384,6 +384,38 @@ class RunnerSafetyTests(unittest.TestCase):
         self.assertEqual(data['totals']['pass'],0)
         self.assertFalse(data['meta']['execution_valid'])
 
+    def test_manifest_without_mode_requires_reference_protocol(self):
+        proc,data,_=self.invoke(self.reference())
+        self.assertEqual(proc.returncode,0)
+        self.assertIsNotNone(data['meta']['reference_provenance'])
+        proc,data,_=self.invoke(self.reference(),['--reference','legacy'])
+        self.assertEqual(proc.returncode,2)
+        # invoke supplies a real manifest for explicit strict; reuse its artifacts.
+        _,_,out=self.invoke(self.reference(),['--reference','strict'])
+        root=out.parent
+        raw=root/'plain.log';raw.write_bytes(self.complete())
+        import run_tests,contextlib,io
+        with contextlib.redirect_stdout(io.StringIO()):
+            code=run_tests.main(['--log',str(raw),'--out',str(root/'replayed'),'--group','iperf','--libc','musl',
+                '--inventory',str(root/'inventory.json'),'--reference-manifest',str(root/'build.manifest.json'),
+                '--reference-artifacts',str(root/'Image'),str(root/'initramfs.gz'),'--reference-image',str(root/'disk.img')])
+        self.assertEqual(code,1)
+        result=json.loads((root/'replayed/summary.json').read_text())
+        self.assertFalse(result['meta']['execution_valid'])
+
+    def test_output_hardlinks_preserve_external_archive(self):
+        import run_tests,contextlib,io
+        from unittest.mock import patch
+        for name in ['serial.log','summary.json','summary.md']:
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);out=root/'out';out.mkdir();archive=root/'archive';archive.write_bytes(b'old evidence')
+                os.link(archive,out/name)
+                with patch.object(run_tests,'capture',return_value=(self.complete(),False,0)),contextlib.redirect_stdout(io.StringIO()):
+                    code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(RUNNER),'--out',str(out),'--libc','musl','--group','iperf'])
+                self.assertEqual(code,0)
+                self.assertEqual(archive.read_bytes(),b'old evidence')
+                self.assertFalse(archive.samefile(out/name))
+
     def test_empty_source_arguments_are_rejected_before_execution(self):
         import contextlib,io,run_tests
         from unittest.mock import patch

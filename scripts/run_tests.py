@@ -35,7 +35,7 @@ atexit.register(_source_cache.cleanup)
 sys.pycache_prefix = _source_cache.name
 sys.dont_write_bytecode = True
 
-from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK
+from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK, validate_official_directory
 from reference_protocol import validate_reference
 from input_snapshot import InputSnapshot
 from lmbench_trace import logged_names as lmbench_logged_names
@@ -273,6 +273,18 @@ def judge_group(
     else:
         judge_path = team_dir / Path(judge_file).name
 
+    if cfg.get('kind') == 'official' and official_hashes is not None:
+        # 官方脚本没有本地依赖；只将固定集合交给子进程，关闭目录检查后的新增窗口。
+        if judge_sources is None:
+            try:
+                validate_official_directory(judge_dir, official_hashes)
+                judge_sources = {p.absolute():p.read_bytes() for p in
+                                 (judge_dir/name for name in official_hashes) if p.is_file()}
+            except (ValueError,OSError) as exc:
+                judge_sources = {}
+        else:
+            judge_sources = {p:raw for p,raw in judge_sources.items()
+                             if p.parent == judge_path.absolute().parent and p.name in official_hashes}
     frozen = judge_sources.get(judge_path.absolute()) if judge_sources is not None else None
     actual_hash = hashlib.sha256(frozen).hexdigest() if frozen is not None else (digest(judge_path) if judge_path.is_file() else None)
     if cfg.get('kind') == 'official' and official_hashes is not None and actual_hash is not None and actual_hash != official_hashes.get(judge_path.name):
@@ -385,10 +397,21 @@ def summarize(results: list[dict]) -> dict:
     return totals
 
 
+def atomic_write(path, raw):
+    with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.result-', delete=False) as handle:
+        stage = Path(handle.name)
+        try:
+            handle.write(raw)
+            handle.close()
+            stage.replace(path)
+        finally:
+            stage.unlink(missing_ok=True)
+
+
 def write_summary(out_dir: Path, meta: dict, results: list[dict], totals: dict) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     payload = {"meta": meta, "totals": totals, "groups": results}
-    (out_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
+    atomic_write(out_dir / "summary.json", json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8"))
 
     lines = [
         "# TEST-001 result summary",
@@ -423,7 +446,7 @@ def write_summary(out_dir: Path, meta: dict, results: list[dict], totals: dict) 
         "A group is PASS only when every inventory subcase passes. TIMEOUT/NOT_RUN/JUDGE_ERROR are not passes.",
         "Scores remain in per-case JSON only; mixed units are never summed.",
     ]
-    (out_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
+    atomic_write(out_dir / "summary.md", "\n".join(lines).encode("utf-8"))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -452,6 +475,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.reference == 'strict' and (args.reference_manifest is None or args.reference_artifacts is None or args.reference_image is None):
         print('strict requires --reference-manifest, --reference-artifacts KERNEL INITRAMFS and --reference-image',file=sys.stderr)
         return 2
+    if args.reference_manifest is not None:
+        if args.reference == 'legacy':
+            print('reference manifest cannot be combined with legacy',file=sys.stderr)
+            return 2
+        args.reference = 'strict'
     snapshot = InputSnapshot(digest)
     # Python 已加载的实现必须先固定身份，不能等耗时的大构件哈希后才读源码版本。
     source_hashes = {str(p.relative_to(ROOT)): snapshot.digest(p) for p in
@@ -540,6 +568,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # 在执行外部命令前固定源码身份，长时间运行期间的编辑不能改写这次执行的来源。
     # 所有会影响判分的文件在采集前登记；缺失文件也登记，防止中途补入。
+    try:
+        validate_official_directory(Path(args.judge_dir), inventory['judge']['files'])
+    except ValueError as exc:
+        print(str(exc),file=sys.stderr)
+        return 2
     judge_paths = judge_files(Path(args.judge_dir)) | judge_files(Path(args.team_judge_dir))
     for group in selected:
         cfg = groups_cfg[group]
@@ -714,7 +747,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / 'serial.log').write_bytes(raw_log)
+    atomic_write(out_dir / 'serial.log', raw_log)
 
     sections_dir = out_dir / "sections"
     if sections_dir.exists():

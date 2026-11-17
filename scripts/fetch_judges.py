@@ -14,7 +14,7 @@ atexit.register(_source_cache.cleanup)
 sys.pycache_prefix = _source_cache.name
 sys.dont_write_bytecode = True
 
-from inventory import ROOT, digest, load_inventory
+from inventory import ROOT, digest, load_inventory, validate_official_directory
 
 
 def fetch(dest: Path) -> None:
@@ -23,6 +23,7 @@ def fetch(dest: Path) -> None:
     hashes = pin['files']
     if dest.exists():
         judge = dest / 'judge'
+        validate_official_directory(judge, hashes)
         if all((judge / name).is_file() and digest(judge / name) == sha for name, sha in hashes.items()):
             print(f'official judges verified: {pin["commit"]}')
             return

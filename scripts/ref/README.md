@@ -175,3 +175,5 @@ tar -xzf target/raw-evidence/test-001-pr29-raw-2026-11-17.tar.gz -C target/raw-e
 按归档 SOURCE.json 核对每份文件 SHA256；manifest/摘要仍在仓库原路径。后续判据快照回归与当前 runner 对既有原始采集的严格回放见 [judges 验证](../../tests/results/review-2026-11-17/judges/summary.md)。
 
 整轮历史回放在第一个子 runner 启动前固定全部 runner 模块、官方/团队判据及递归本地依赖。每个样本前后检查文件集合与哈希，新增、删除、编辑均失败；子摘要的源码/判据哈希还须匹配整轮记录，报告保留统一来源。lmbench 所有冻结命令均预留尝试，带标签结果消费预留项，缺结果不能由重试抹除。
+
+官方 judge 无本地依赖，目录只允许清单固定的五个脚本和被隔离的 __pycache__，额外模块/包/数据会被缓存检查及 runner 拒绝；子进程副本也仅包含固定脚本。显式传 manifest 即启用 strict 日志与构建 ID 校验，与 legacy 同时使用退出 2。serial.log、summary.json、summary.md 采用同目录临时文件原子替换，复用输出不会改写外部硬链接指向的旧证据；不承诺三个文件跨文件事务。

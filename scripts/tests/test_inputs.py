@@ -244,3 +244,18 @@ class InputTests(unittest.TestCase):
             with self.assertRaises(ValueError):replay.verify_sources(judges,before)
             helper.write_text('x=1');(judges/'new.py').write_text('x=1')
             with self.assertRaises(ValueError):replay.verify_sources(judges,before)
+
+    def test_official_cache_rejects_extra_dependencies(self):
+        import shutil
+        source=ROOT/'third_party/oskernel-testsuits-cooperation/judge'
+        for name in ['json.py','json/__init__.py','extra.txt']:
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as tmp:
+                dest=Path(tmp)/'cache';shutil.copytree(source,dest/'judge')
+                extra=dest/'judge'/name;extra.parent.mkdir(exist_ok=True);extra.write_text('unfixed')
+                with self.assertRaises(ValueError):fetch(dest)
+                import run_tests,contextlib,io
+                from unittest.mock import patch
+                with patch.object(run_tests,'capture',side_effect=AssertionError('capture executed')),contextlib.redirect_stderr(io.StringIO()):
+                    code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(ROOT/'scripts/run_tests.py'),
+                        '--out',str(Path(tmp)/'out'),'--libc','musl','--group','basic','--judge-dir',str(dest/'judge')])
+                self.assertEqual(code,2)
