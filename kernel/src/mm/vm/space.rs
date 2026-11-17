@@ -161,7 +161,8 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
         if self.state == State::Active || self.arch.current_root()?.is_some() {
             return Err(VmError::InvalidState);
         }
-        // SAFETY: 基础布局已完整建立，本对象持有根及全部下级表页，停用并同步前不回收。
+        // SAFETY: 基础布局已完整建立，本对象持有根及全部可达下级表页。
+        // 根持有至确认停用并完成本核同步；空子表断开父项并完成本核同步后才回收。
         // 调用者保证执行、异常和日志路径在切换前后有效。
         unsafe {
             self.arch.activate(self.root)?;
