@@ -26,6 +26,8 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支按 [MM-003](specs/MM-003.md) 实现 QEMU 内核 Sv39 分页，新增 `make vm-smoke` 验证非恒等地址写读、只读与不可执行保护、撤销、重映射及页表回收。接口与验收约定见[参考页](docs/reference/sv39-paging.md)，运行方法见[上手指南](docs/getting-started.md)。实现待人工审阅；用户态隔离与真板分页另行验收。
 
+测试接入的重设计见 [TEST-001 草案](specs/TEST-001.md)：将构建、采集和日志分析拆开，先审接口与验收，再分期实现。当前未交付新 runner；参考 Linux 与外部日志都不能计为 FocOS 成绩。
+
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
 **历史测试、开发工具和文件系统性能均无通过成绩。** 本页目标不是已有功能。
@@ -107,6 +109,7 @@ Focos/
 │   ├── PLAT-002.md                    # QEMU 板级配置与启动内存迁移
 │   ├── DRV-001.md                     # 设备接入、DMA/IRQ 与错误（草案）
 │   ├── HAL-001.md                     # 块设备接口与内存盘
+│   ├── TEST-001.md                    # 采集证据与日志判分的阶段边界（重设计草案）
 │   ├── TEST-002.md                    # 独立镜像模型的共享块接口检查（草案）
 │   ├── BOOT-001.md                    # QEMU 启动验收
 │   ├── MM-001.md                      # 页分配与回收
@@ -139,6 +142,7 @@ Focos/
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
+│       ├── test001-redesign.md         # TEST-001 接口、历史教训与分期验收
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项

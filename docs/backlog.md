@@ -33,7 +33,7 @@ PR #32 的架构约定已经合入，先把以下边界落实到实现与测试�
 
 | 任务 | 第一份交付 |
 | --- | --- |
-| [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 冻结镜像、子用例和判据；按 Issue 当前认领记录推进 |
+| [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 先审 [TEST-001 重设计](../specs/TEST-001.md)，再按 A→D 分期交付；当前进度见 Issue |
 | [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) | 镜像特性调查与 host 只读测试 |
 | [#23 动态加载、线程、信号](https://github.com/MindScrath/Focos/issues/23) | 动态 ELF 的解释器/库依赖；架构 ABI 与公共运行时分工 |
 | [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | 一对客户端/服务端收发及超时测试 |
