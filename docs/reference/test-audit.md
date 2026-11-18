@@ -8,11 +8,11 @@
 
 | 采用的资料 | 要做什么 | 在哪里验收 |
 | --- | --- | --- |
-| `pre-2025`：2025 年全国赛初赛 | 排除 LTP 后，其余 11 组的所有子用例都要通过；musl、glibc 两种版本分别运行 | QEMU RISC-V |
+| `pre-2025`：2025 年全国赛初赛 | 原 11 组与比赛 LTP 的所有纳入子用例都要通过；musl、glibc 两种版本分别运行 | QEMU RISC-V |
 | `on-site-final-2025`：2025 年全国赛现场题 | vim 能编辑、保存并重新打开文件；gcc 能在 FocOS 内编译、链接并运行新程序 | QEMU RISC-V 和 VisionFive2 |
 | 团队新增的 make 检查 | 构建一个含两个源文件的小工程；修改一个文件后只重编受影响目标；`make clean` 能清理产物 | QEMU RISC-V 和 VisionFive2 |
 
-LTP 是 Linux 内核测试套件，本阶段明确不纳入。musl 和 glibc 是两种 C 标准库；官方提供了基于它们构建的两套程序，不能只测其中一套。
+LTP 是 Linux 内核测试套件，按 2026-11-18 的 #8 扩围纳入本阶段；以比赛冻结版本与镜像为准，具体调用列表仍待审计。musl 和 glibc 是两种 C 标准库；官方提供了基于它们构建的两套程序，不能只测其中一套。
 
 这里的“通过”包括检查程序结果和实际文件操作，不是脚本执行到了末尾。子用例清单仍需随镜像核对后冻结。LoongArch 留到全国赛；真板文件闭环和缓存实验见 [完整交付标准](../../specs/REGION-001.md)。
 
@@ -29,7 +29,7 @@ LTP 是 Linux 内核测试套件，本阶段明确不纳入。musl 和 glibc 是
 
 其余分支：`main/master/testscripts/pre-2023` 是早期基础参考；`final/final-comp/libc-test` 是旧综合测试；`pre-2024-riscv64/aarch64/x86_64` 不能仅按名字认定平台；`final-2024-rv/la` 是分架构 Ext4 测试；`2025_multiarch` 供构建差异核对；`on-site-final-2023/2024` 留作历史参考。不要把 main 当成最新赛题。
 
-## 11 组带来哪些内核能力
+## 测试组带来哪些内核能力
 
 | 测试组 | 重点依赖 |
 | --- | --- |
@@ -37,9 +37,10 @@ LTP 是 Linux 内核测试套件，本阶段明确不纳入。musl 和 glibc 是
 | libctest、libcbench | libc 语义、动态加载、TLS、mmap 与线程等，逐子项核对 |
 | iozone、unixbench、lmbench | 文件 I/O、进程/管道、映射、信号和计时 |
 | iperf、netperf | TCP/UDP、loopback、并发连接、阻塞与退出 |
+| ltp | 按冻结调用逐项审计系统调用、权限、设备及环境前提；缺能力不豁免 |
 | cyclictest | 线程、定时、调度/亲和性接口、压力子进程与信号 |
 
-组名和脚本固定在 [regional-plan.json](../../tests/regional-plan.json)。**全部**指脚本展开后的子用例全部满足判据；不是只运行 11 个脚本或只选 musl。性能程序应完成操作、生成有效结果，不要求追平 Linux 性能或宣称历史满分。
+组名和脚本固定在 [regional-plan.json](../../tests/regional-plan.json)。**全部**指脚本展开后的子用例全部满足判据；不是只运行组脚本或只选 musl。性能程序应完成操作、生成有效结果，不要求追平 Linux 性能或宣称历史满分。
 
 ## 镜像与工具：已知道什么，尚缺什么
 

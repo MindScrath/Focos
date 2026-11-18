@@ -4,7 +4,7 @@
   "upstream_runner": "riscv-syscalls-testing/user/src/oscomp/run-all.sh",
   "entry_count": 32,
   "p0_candidate_count": 16,
-  "note": "Historical 32-program pre-2024 bring-up inventory; not the regional completion target. Use regional-plan.json and REGION-001 for the 2025 non-LTP target. No tests executed.",
+  "note": "Historical 32-program pre-2024 bring-up inventory; not the regional completion target. Use regional-plan.json and REGION-001 for the 2025 target including competition LTP. No tests executed.",
   "entries": [
     {
       "entry": "brk",

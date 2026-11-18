@@ -16,7 +16,7 @@
 - Rust `no_std` 内核；VisionFive2 首平台，2K1000LA 星云板全国赛扩展。
 - FAT32 是基础文件系统与优化对象；区域赛增加 Ext4 后端运行 2025 原版测试与工具镜像。
 - FS/VFS/缓存不含架构条件编译；CPU 机制归 arch，机器资源与装配归 platform，控制器操作归 drivers。HAL 提供统一接口，职责以 [架构文档](docs/architecture.md) 为准；新增目录随实现落地。
-- 区域赛目标以 [REGION-001](specs/REGION-001.md) 为准：2025 初赛除 LTP、vim/gcc/make、真板文件闭环及缓存证据。旧 2024 P0 只是起步练习。
+- 区域赛目标以 [REGION-001](specs/REGION-001.md) 为准：2025 初赛全部测试（含比赛冻结版本 LTP）、vim/gcc/make、真板文件闭环及缓存证据。旧 2024 P0 只是起步练习。
 - 不上传凭据、报名个人资料、邮箱或 `devdoc/`。
 
 ## 开发与审阅

@@ -4,12 +4,12 @@ FocOS（读作 Focus）是 Rust `no_std` 操作系统。我们要在 VisionFive2
 
 ## 区域赛要交什么
 
-- **兼容性**：2025 初赛除 LTP 的 11 组测试，RISC-V 的 musl/glibc 都通过。
+- **兼容性**：2025 初赛全部测试（原 11 组及比赛冻结版本 LTP），RISC-V 的 musl/glibc 都通过。
 - **可用性**：vim 编辑保存，gcc 编译并运行新程序，make 完整与增量构建；在 QEMU RISC-V 和 VisionFive2 分别演示。
 - **内核与存储**：真板自有设备驱动、内存与任务、用户态；FAT32 同步后重启读回。Ext4 后端运行历史原版镜像。
 - **实验**：真板 FAT32 基线与缓存对照，有原始数据和可重画的图表。
 
-准确范围见 [REGION-001](specs/REGION-001.md)。LoongArch 双平台、完整 LTP、2026 复杂负载和真实磁盘 HNSW 查询留到全国赛。新目标工期风险较高，检查点见 [路线](docs/roadmap.md)。
+准确范围见 [REGION-001](specs/REGION-001.md)。LoongArch 双平台、当届新增兼容测试、2026 复杂负载和真实磁盘 HNSW 查询留到全国赛。新目标工期风险较高，检查点见 [路线](docs/roadmap.md)。
 
 
 ## 当前到哪里了

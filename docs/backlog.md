@@ -33,7 +33,7 @@ PR #32 的架构约定已经合入，先把以下边界落实到实现与测试�
 
 | 任务 | 第一份交付 |
 | --- | --- |
-| [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 先审 [TEST-001 重设计](../specs/TEST-001.md)，再按 A→D 分期交付；当前进度见 Issue |
+| [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 先审 [TEST-001 含 LTP 的规格修订](../specs/TEST-001.md)，再按 A→D 分期交付；当前进度见 Issue |
 | [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) | 镜像特性调查与 host 只读测试 |
 | [#23 动态加载、线程、信号](https://github.com/MindScrath/Focos/issues/23) | 动态 ELF 的解释器/库依赖；架构 ABI 与公共运行时分工 |
 | [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | 一对客户端/服务端收发及超时测试 |
@@ -46,6 +46,6 @@ PR #32 的架构约定已经合入，先把以下边界落实到实现与测试�
 - [#9 缓存实验](https://github.com/MindScrath/Focos/issues/9)：公共缓存策略、统一预算与统计位置明确后，比较 B0/B1。
 - [#10 提交与教学材料](https://github.com/MindScrath/Focos/issues/10)：独立复现、许可与赛方提交项。
 - [#11 LoongArch 与星云板](https://github.com/MindScrath/Focos/issues/11)：资料可先调查；实现先验 QEMU 架构，再验真板资源与设备。
-- [#12 全国赛扩展](https://github.com/MindScrath/Focos/issues/12)：双平台、LTP、2026 参考负载和真实磁盘检索。
+- [#12 全国赛扩展](https://github.com/MindScrath/Focos/issues/12)：双平台、当届新增兼容测试、2026 参考负载和真实磁盘检索。
 
 交付边界见 [REGION-001](../specs/REGION-001.md)，检查点见 [路线](roadmap.md)。
