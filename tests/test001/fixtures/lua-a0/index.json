@@ -1,0 +1,582 @@
+{
+  "base_commit": "4f5d414844a82e3ca89b36f2c9ac139ab74ddd54",
+  "date": "2026-11-19",
+  "environment": {
+    "LC_ALL": "C",
+    "PATH": "/bin",
+    "TERM": "dumb",
+    "TZ": "UTC",
+    "gid": 0,
+    "rootfs": "minimal per-libc initramfs, no block disk",
+    "rtc": "QEMU default host-derived wall clock; not frozen",
+    "stdin": "QEMU host stdin /dev/null; guest inherited console descriptors",
+    "uid": 0,
+    "umask": "022"
+  },
+  "evidence_files": {
+    "glibc.serial.fragment": {
+      "sha256": "1be01a8a5f5e830c6cbcca09909fccb0b84d8aa67e09ab57572e66b615dfd911",
+      "size": 878
+    },
+    "init.sh": {
+      "sha256": "b763642779a277d57c1ffbf669684be5c4672f43f23bf9a9e19a6791ccba056b",
+      "size": 868
+    },
+    "musl.serial.fragment": {
+      "sha256": "2350a1cb2ec1f910ce99c7af136a2ff12cc02c41583b749ef9887186961e4c6e",
+      "size": 874
+    },
+    "pack.py": {
+      "sha256": "8d68f40d6171434a9b634fbeea3b2ff7b1406bb15582494072dc9010de849dc2",
+      "size": 2785
+    }
+  },
+  "firmware": {
+    "host_path": "/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin",
+    "sha256": "49bdf7b939bda11321132d1042bf99d7324fb190f1feef423171fed3573f8705",
+    "size": 273048
+  },
+  "kernel": {
+    "apk_sha256": "47034305e6ddde9717652ce1da25d29b51ae88b997ab7c69b0beeee00ccc9369",
+    "apk_url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/riscv64/linux-lts-6.18.63-r0.apk",
+    "decompression": "gzip",
+    "image": {
+      "sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638",
+      "size": 22380544
+    },
+    "member": "boot/vmlinuz-lts"
+  },
+  "platform": "reference Linux on QEMU RISC-V, not FocOS/VF2",
+  "qemu": {
+    "executable": {
+      "sha256": "df4a9e8a7a8a3f9f8dfa834af228127a722d86428e206728d28e0becb35413b3",
+      "size": 14258456
+    },
+    "version": "QEMU emulator version 10.2.2 (qemu-10.2.2-1.fc44)\nCopyright (c) 2003-2025 Fabrice Bellard and the QEMU Project developers\n"
+  },
+  "recipe_dependencies": {
+    "scripts/test001_audit.py": {
+      "sha256": "af3bcee38313c50ba8ab6c64f2a05c64fc2db70e0d9aa631682623aa23e96886",
+      "size": 11661
+    },
+    "tests/test001/audit-inputs.lock.json": {
+      "sha256": "9752d70a0be5d6320a9fdcc39151cd2732b7d372c7f4fc7de378e74613d0b683",
+      "size": 6866
+    }
+  },
+  "samples": {
+    "glibc": {
+      "archive_members": [
+        {
+          "mode": "0o40755",
+          "path": "bin",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o40755",
+          "path": "dev",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o40755",
+          "path": "glibc",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o20600",
+          "path": "dev/console",
+          "rdev": [
+            5,
+            1
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o20666",
+          "path": "dev/null",
+          "rdev": [
+            1,
+            3
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o120777",
+          "path": "bin/busybox",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "265943c488d0032a2c2510996bed38978ab1098cdbadd2c714d08e9bcba9116a",
+          "size": 16
+        },
+        {
+          "mode": "0o120777",
+          "path": "bin/sh",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "9d75f0d7c398df565d7ac04c6819b62d6d8f9560f5eb4672596ecd8f7e96ae91",
+          "size": 7
+        },
+        {
+          "mode": "0o100755",
+          "path": "init",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "b763642779a277d57c1ffbf669684be5c4672f43f23bf9a9e19a6791ccba056b",
+          "size": 868
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/busybox",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "849e80f2625c1f17edde839f649236a5d39ba311c72fdb569d3d6fdbeb676015",
+          "size": 1745480
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "efd551de2331fd848986e90593a5d4bf963bd199695393a21be1d583e511e18b",
+          "size": 880992
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/lua_testcode.sh",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "345221f53b3d487e9c00e3bf84cd07f874305e875be7c0ea9b4390cfaec589cb",
+          "size": 314
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/test.sh",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "ecd0e074af40def9796860987cf49b5f9cb7817d72496bcdb4d3a31bb9d91043",
+          "size": 118
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/date.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "c889cf9dced11331a4e29c62834d89fd00f011dd2eddbf0c7a3ff6398d6ed043",
+          "size": 99
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/file_io.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "2f934d70bacc2be2217561c6fac33ba871e5e387957ea57615d4199670bf269a",
+          "size": 127
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/max_min.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "96954388c5b04dc6b771bcb8c79a4261f9e81f5a0c646899034d60c5bb6a8adb",
+          "size": 125
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/random.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "ff19e6447d80ea1c3dee64666a6263cc65f804ab23b5a5aebce248cbd1ccf3e4",
+          "size": 147
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/remove.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "38b455f6cbbb431a14945ace9678ff8d0bdbe8256dbd4bb1150d557f9d145de2",
+          "size": 154
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/round_num.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "34743872f30df3bf331f1c302a0942f9207ab5cc6fcdae8a379dbb66cabd32c1",
+          "size": 87
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/sin30.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "80e1ea253ffa4c9c9f351bac11d9945c07cff2cd57722afc49c6170b181a5a9c",
+          "size": 72
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/sort.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "9ff99e844692adb1f3be205d7a2cba0cff304249685dea3471c8b8d341068243",
+          "size": 163
+        },
+        {
+          "mode": "0o100755",
+          "path": "glibc/strings.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "03c067e1b0d760486d1cc69b6f1397db40e9754e681f6e1e24c124b6a3a107a8",
+          "size": 591
+        }
+      ],
+      "fragment_byte_range": [
+        13986,
+        14864
+      ],
+      "full_stdout": {
+        "sha256": "268f51ea2bdd73a5c7769e1960f041a5e7a381d631a725001ded004eceeb7efa",
+        "size": 14899
+      },
+      "group_byte_range_in_fragment": [
+        43,
+        431
+      ],
+      "initramfs": {
+        "sha256": "9a3992806d0816cd668497afe8445f7471e9ec7d383530936da35f2749c30954",
+        "size": 2632108
+      },
+      "qemu_argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "256M",
+        "-smp",
+        "1",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "{firmware}",
+        "-kernel",
+        "{Image}",
+        "-initrd",
+        "{glibc.cpio}",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1 LIBC=glibc"
+      ],
+      "qemu_returncode": 0,
+      "serial_fragment": "glibc.serial.fragment",
+      "stderr_size": 0,
+      "timeout_seconds": 60
+    },
+    "musl": {
+      "archive_members": [
+        {
+          "mode": "0o40755",
+          "path": "bin",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o40755",
+          "path": "dev",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o40755",
+          "path": "musl",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o20600",
+          "path": "dev/console",
+          "rdev": [
+            5,
+            1
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o20666",
+          "path": "dev/null",
+          "rdev": [
+            1,
+            3
+          ],
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "mode": "0o120777",
+          "path": "bin/busybox",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "efaa3596ac379b430a6268960558444287a7f9e60741491e0ac4cd6b993a875e",
+          "size": 15
+        },
+        {
+          "mode": "0o120777",
+          "path": "bin/sh",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "9d75f0d7c398df565d7ac04c6819b62d6d8f9560f5eb4672596ecd8f7e96ae91",
+          "size": 7
+        },
+        {
+          "mode": "0o100755",
+          "path": "init",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "b763642779a277d57c1ffbf669684be5c4672f43f23bf9a9e19a6791ccba056b",
+          "size": 868
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/busybox",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "bc09c5ae5eabf091d0ded0208a17a1173725f10d8b79264d896d09c9553c68de",
+          "size": 1387560
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "f7bf0f5c7d2cf80dbcc4e8aaee6e7b44621eefc729ff7fac1564ba558890ef95",
+          "size": 476144
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/lua_testcode.sh",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "d9a4e3f51de689766dbfe067f11a0a54ddb6c2e8e9bc0c956a3535194a9a6e26",
+          "size": 312
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/test.sh",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "ecd0e074af40def9796860987cf49b5f9cb7817d72496bcdb4d3a31bb9d91043",
+          "size": 118
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/date.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "c889cf9dced11331a4e29c62834d89fd00f011dd2eddbf0c7a3ff6398d6ed043",
+          "size": 99
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/file_io.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "2f934d70bacc2be2217561c6fac33ba871e5e387957ea57615d4199670bf269a",
+          "size": 127
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/max_min.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "96954388c5b04dc6b771bcb8c79a4261f9e81f5a0c646899034d60c5bb6a8adb",
+          "size": 125
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/random.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "ff19e6447d80ea1c3dee64666a6263cc65f804ab23b5a5aebce248cbd1ccf3e4",
+          "size": 147
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/remove.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "38b455f6cbbb431a14945ace9678ff8d0bdbe8256dbd4bb1150d557f9d145de2",
+          "size": 154
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/round_num.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "34743872f30df3bf331f1c302a0942f9207ab5cc6fcdae8a379dbb66cabd32c1",
+          "size": 87
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/sin30.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "80e1ea253ffa4c9c9f351bac11d9945c07cff2cd57722afc49c6170b181a5a9c",
+          "size": 72
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/sort.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "9ff99e844692adb1f3be205d7a2cba0cff304249685dea3471c8b8d341068243",
+          "size": 163
+        },
+        {
+          "mode": "0o100755",
+          "path": "musl/strings.lua",
+          "rdev": [
+            0,
+            0
+          ],
+          "sha256": "03c067e1b0d760486d1cc69b6f1397db40e9754e681f6e1e24c124b6a3a107a8",
+          "size": 591
+        }
+      ],
+      "fragment_byte_range": [
+        13984,
+        14858
+      ],
+      "full_stdout": {
+        "sha256": "1bd93f82aeacb63b601d3ff23e565eaa63f3236024fdff5e2b30d6af100594d5",
+        "size": 14893
+      },
+      "group_byte_range_in_fragment": [
+        42,
+        428
+      ],
+      "initramfs": {
+        "sha256": "9bd3ebd2f06ed6f9be29034d129a865e847a69f3aaab21b7cab52ed915e3b1ad",
+        "size": 1869328
+      },
+      "qemu_argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "256M",
+        "-smp",
+        "1",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "{firmware}",
+        "-kernel",
+        "{Image}",
+        "-initrd",
+        "{musl.cpio}",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1 LIBC=musl"
+      ],
+      "qemu_returncode": 0,
+      "serial_fragment": "musl.serial.fragment",
+      "stderr_size": 0,
+      "timeout_seconds": 60
+    }
+  },
+  "schema_version": 1,
+  "scope": "A0_SYNTAX_SAMPLE_NOT_CAPTURE",
+  "trust": "external_log/unknown"
+}

@@ -1,0 +1,35 @@
+{
+  "executables": {},
+  "files": {
+    "glibc.debugfs": {
+      "operation": "ls -p",
+      "path": "/glibc",
+      "sha256": "14a63fe1be270bef1590e1c0c38a3233ac88af08892a2c8f53c2a4e0d5312833",
+      "size": 4173,
+      "source": "image"
+    },
+    "musl.debugfs": {
+      "operation": "ls -p",
+      "path": "/musl",
+      "sha256": "bd44c6379bc8e407fc47f856d5c989bffa4630af4ceea7609560006bb4a65bac",
+      "size": 3757,
+      "source": "image"
+    },
+    "root.debugfs": {
+      "operation": "ls -p",
+      "path": "/",
+      "sha256": "16f59b1b9fb2f207fb3e680d95a45838957de4ff51bc8a31c75d8215f8bae061",
+      "size": 115,
+      "source": "image"
+    }
+  },
+  "image": {
+    "asset": "sdcard-rv.img.xz",
+    "release": "pre-20250615",
+    "uncompressed_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+    "uncompressed_size": 4294967296,
+    "url": "https://github.com/oscomp/testsuits-for-oskernel/releases/download/pre-20250615/sdcard-rv.img.xz"
+  },
+  "listing_tool": "debugfs 1.47.3 (8-Jul-2025); ls -p stdout",
+  "schema_version": 1
+}

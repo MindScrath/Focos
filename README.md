@@ -26,7 +26,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支按 [MM-003](specs/MM-003.md) 实现 QEMU 内核 Sv39 分页，新增 `make vm-smoke` 验证非恒等地址写读、只读与不可执行保护、撤销、重映射及页表回收。接口与验收约定见[参考页](docs/reference/sv39-paging.md)，运行方法见[上手指南](docs/getting-started.md)。实现待人工审阅；用户态隔离与真板分页另行验收。
 
-测试接入的重设计见 [TEST-001 草案](specs/TEST-001.md)：将构建、采集和日志分析拆开，先审接口与验收，再分期实现。当前未交付新 runner；参考 Linux 与外部日志都不能计为 FocOS 成绩。
+测试接入按 [TEST-001](specs/TEST-001.md) 的 A0–A3 门槛推进。目前 A0 已有 [BusyBox/Lua 调用审计](docs/reference/test001-a0-audit.md)、[LTP 目录审计](docs/reference/test001-a0-ltp.md)和 [ELF 链接证据](docs/reference/test001-a0-elf.md)；启动缺口见[脚本启动路径与共享数据](docs/reference/test001-a0-runtime.md)；本批补充 [Lua 真实语法样本](docs/reference/test001-a0-lua-samples.md)，供 A1 单组解析使用。完整 A0 和新 runner 尚未交付，参考 Linux 与外部日志不能计为 FocOS 成绩。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
@@ -35,7 +35,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 ## 第一天怎么做
 
 1. 按 [上手指南](docs/getting-started.md) 运行 `make check`，看到 `PASS: BOOT-001`。
-2. 到 [任务入口](docs/backlog.md) 认领一小步，约队友审阅。
+2. 从 [任务导航](docs/backlog.md) 找到对应 Issue，认领一小步并约队友审阅。
 3. 用 [SPEC 模板](specs/TEMPLATE.md) 约定行为，按 [六步 SOP](docs/collaboration.md) 实现并提交 PR。
 
 | 想了解什么 | 去哪里 |
@@ -118,19 +118,47 @@ Focos/
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
+│   ├── test_test001_lua_samples.py    # 真实 Lua 片段身份、成员集合与包装器观察
+│   ├── test001_runtime_audit.py       # 解释器路径、基盘布局与初始写入目标
+│   ├── test_test001_runtime_audit.py   # 缺失/未知、来源、再生与错误传播
+│   ├── test001_elf_audit.py           # 四个锁定 ELF 的私有副本与 readelf 证据
+│   ├── test_test001_elf_audit.py       # 身份、工具失败与无部分 JSON
+│   ├── test001_ltp_audit.py           # A0 LTP 目录候选、脚本位置与 libc 差异
+│   ├── test_test001_ltp_audit.py       # 目录语法、候选边界、再生与失败传播
+│   ├── test001_audit.py               # A0 BusyBox/Lua 只读调用审计
+│   ├── test_test001_audit.py          # 审计顺序、重复、read 语义及输入校验
 │   ├── smoke.py                       # 检查启动、物理页、中断状态与分页专项
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
 │   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
 │   ├── test_vm_api.py                 # 编译调用方，验证分页借用与 unsafe 边界
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
+│   ├── test001/                      # A0 审计输入（非可执行 PROFILE）
+│   │   ├── fixtures/lua-a0/           # 参考 Linux Lua 语法样本，非运行包
+│   │   │   ├── init.sh               # 原组调用与组外退出语义探针
+│   │   │   ├── pack.py               # 本实验的确定性 newc 归档配方
+│   │   │   ├── index.json            # 工具/输入身份、字节区间和成员清单
+│   │   │   └── *.serial.fragment     # musl/glibc 原样 CRLF 串口片段
+│   │   ├── runtime-audit-inputs/      # 根目录与两套 libc 原样 debugfs 目录
+│   │   ├── runtime-audit-inputs.lock.json # 三份目录及镜像身份
+│   │   ├── runtime-audit-report.json  # 可再生的脚本启动路径与基盘状态
+│   │   ├── elf-audit-evidence.json    # 四个 ELF 原始程序头/动态段检查及版本
+│   │   ├── ltp-audit-candidates.jsonl # LTP 文件候选，不含执行序号
+│   │   ├── ltp-audit-inputs.lock.json # LTP 镜像脚本与目录输出身份
+│   │   ├── ltp-audit-inputs/          # 两套 libc 的脚本及原样 debugfs 目录
+│   │   ├── audit-calls.jsonl         # 128 条有序候选记录，不是执行成绩
+│   │   ├── audit-inputs.lock.json    # 镜像/提取文件/可执行文件身份
+│   │   └── audit-inputs/             # 原样文本证据，不执行
+│   │       ├── musl/                # 四份 shell/命令表与九份 Lua 输入
+│   │       ├── glibc/               # 对应 glibc 文本输入
+│   │       └── judge/               # 两份固定上游 judge，仅静态对照
 │   ├── catalog.json                   # 2024 起步用 basic 清单
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南
 │   ├── getting-started.md             # 配环境、运行和首次提交
 │   ├── architecture.md                # 内核分层与跨平台扩展图
-│   ├── backlog.md                     # 可认领任务与依赖入口
+│   ├── backlog.md                     # 模块与 Issue 导航，实时进度在 Issue
 │   ├── collaboration.md               # 认领、测试、审阅与合入流程
 │   ├── roadmap.md                     # 周目标与进度取舍
 │   ├── verification.md                # 怎样接入测例并记录功能证据
@@ -142,7 +170,13 @@ Focos/
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
-│       ├── test001-redesign.md         # TEST-001 接口、历史教训与分期验收
+│       ├── test001-redesign.md         # TEST-001 包、采集和批次契约
+│       ├── test001-a0-lua-samples.md  # 真实语法、包装器边界与复现实验
+│       ├── test001-a0-runtime.md      # 解释器缺口、PATH 与文件生命周期
+│       ├── test001-a0-elf.md          # ELF 链接观察、复现与剩余运行依赖
+│       ├── test001-a0-ltp.md          # LTP 目录/遍历语义与未闭合边界
+│       ├── test001-a0-audit.md        # BusyBox/Lua 输入、差异与未完成边界
+│       ├── test001-analysis-contract.md # 唯一解析路径、两轮教训与 A0–A3 门槛
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项

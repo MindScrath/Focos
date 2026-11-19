@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "scope": [
+    "busybox",
+    "lua"
+  ],
+  "status": "AUDIT_CANDIDATE",
+  "image": {
+    "release": "pre-20250615",
+    "asset": "sdcard-rv.img.xz",
+    "uncompressed_size": 4294967296,
+    "uncompressed_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+    "url": "https://github.com/oscomp/testsuits-for-oskernel/releases/download/pre-20250615/sdcard-rv.img.xz"
+  },
+  "judge_source": {
+    "repository": "oscomp/oskernel-testsuits-cooperation",
+    "commit": "44fa7ac65f292580c3974a8252f533c4484ebe6b"
+  },
+  "files": {
+    "musl/busybox_testcode.sh": {
+      "sha256": "5c8fe2230c928b716517631fad55b2f68fbdb351bd344d321bfd4c54c769b4d4",
+      "size": 665,
+      "source": "image",
+      "path": "/musl/busybox_testcode.sh"
+    },
+    "musl/busybox_cmd.txt": {
+      "sha256": "e970e5ecf547980a7d2b3dd5ac2b1552115186055f3e44196550c0ba3356d623",
+      "size": 868,
+      "source": "image",
+      "path": "/musl/busybox_cmd.txt"
+    },
+    "musl/lua_testcode.sh": {
+      "sha256": "d9a4e3f51de689766dbfe067f11a0a54ddb6c2e8e9bc0c956a3535194a9a6e26",
+      "size": 312,
+      "source": "image",
+      "path": "/musl/lua_testcode.sh"
+    },
+    "musl/test.sh": {
+      "sha256": "ecd0e074af40def9796860987cf49b5f9cb7817d72496bcdb4d3a31bb9d91043",
+      "size": 118,
+      "source": "image",
+      "path": "/musl/test.sh"
+    },
+    "musl/date.lua": {
+      "sha256": "c889cf9dced11331a4e29c62834d89fd00f011dd2eddbf0c7a3ff6398d6ed043",
+      "size": 99,
+      "source": "image",
+      "path": "/musl/date.lua"
+    },
+    "musl/file_io.lua": {
+      "sha256": "2f934d70bacc2be2217561c6fac33ba871e5e387957ea57615d4199670bf269a",
+      "size": 127,
+      "source": "image",
+      "path": "/musl/file_io.lua"
+    },
+    "musl/max_min.lua": {
+      "sha256": "96954388c5b04dc6b771bcb8c79a4261f9e81f5a0c646899034d60c5bb6a8adb",
+      "size": 125,
+      "source": "image",
+      "path": "/musl/max_min.lua"
+    },
+    "musl/random.lua": {
+      "sha256": "ff19e6447d80ea1c3dee64666a6263cc65f804ab23b5a5aebce248cbd1ccf3e4",
+      "size": 147,
+      "source": "image",
+      "path": "/musl/random.lua"
+    },
+    "musl/remove.lua": {
+      "sha256": "38b455f6cbbb431a14945ace9678ff8d0bdbe8256dbd4bb1150d557f9d145de2",
+      "size": 154,
+      "source": "image",
+      "path": "/musl/remove.lua"
+    },
+    "musl/round_num.lua": {
+      "sha256": "34743872f30df3bf331f1c302a0942f9207ab5cc6fcdae8a379dbb66cabd32c1",
+      "size": 87,
+      "source": "image",
+      "path": "/musl/round_num.lua"
+    },
+    "musl/sin30.lua": {
+      "sha256": "80e1ea253ffa4c9c9f351bac11d9945c07cff2cd57722afc49c6170b181a5a9c",
+      "size": 72,
+      "source": "image",
+      "path": "/musl/sin30.lua"
+    },
+    "musl/sort.lua": {
+      "sha256": "9ff99e844692adb1f3be205d7a2cba0cff304249685dea3471c8b8d341068243",
+      "size": 163,
+      "source": "image",
+      "path": "/musl/sort.lua"
+    },
+    "musl/strings.lua": {
+      "sha256": "03c067e1b0d760486d1cc69b6f1397db40e9754e681f6e1e24c124b6a3a107a8",
+      "size": 591,
+      "source": "image",
+      "path": "/musl/strings.lua"
+    },
+    "glibc/busybox_testcode.sh": {
+      "sha256": "2b533111800370f23e5c5f6228f5153d7024e2b8b984bbff42f9cd34d63fc820",
+      "size": 667,
+      "source": "image",
+      "path": "/glibc/busybox_testcode.sh"
+    },
+    "glibc/busybox_cmd.txt": {
+      "sha256": "e970e5ecf547980a7d2b3dd5ac2b1552115186055f3e44196550c0ba3356d623",
+      "size": 868,
+      "source": "image",
+      "path": "/glibc/busybox_cmd.txt"
+    },
+    "glibc/lua_testcode.sh": {
+      "sha256": "345221f53b3d487e9c00e3bf84cd07f874305e875be7c0ea9b4390cfaec589cb",
+      "size": 314,
+      "source": "image",
+      "path": "/glibc/lua_testcode.sh"
+    },
+    "glibc/test.sh": {
+      "sha256": "ecd0e074af40def9796860987cf49b5f9cb7817d72496bcdb4d3a31bb9d91043",
+      "size": 118,
+      "source": "image",
+      "path": "/glibc/test.sh"
+    },
+    "glibc/date.lua": {
+      "sha256": "c889cf9dced11331a4e29c62834d89fd00f011dd2eddbf0c7a3ff6398d6ed043",
+      "size": 99,
+      "source": "image",
+      "path": "/glibc/date.lua"
+    },
+    "glibc/file_io.lua": {
+      "sha256": "2f934d70bacc2be2217561c6fac33ba871e5e387957ea57615d4199670bf269a",
+      "size": 127,
+      "source": "image",
+      "path": "/glibc/file_io.lua"
+    },
+    "glibc/max_min.lua": {
+      "sha256": "96954388c5b04dc6b771bcb8c79a4261f9e81f5a0c646899034d60c5bb6a8adb",
+      "size": 125,
+      "source": "image",
+      "path": "/glibc/max_min.lua"
+    },
+    "glibc/random.lua": {
+      "sha256": "ff19e6447d80ea1c3dee64666a6263cc65f804ab23b5a5aebce248cbd1ccf3e4",
+      "size": 147,
+      "source": "image",
+      "path": "/glibc/random.lua"
+    },
+    "glibc/remove.lua": {
+      "sha256": "38b455f6cbbb431a14945ace9678ff8d0bdbe8256dbd4bb1150d557f9d145de2",
+      "size": 154,
+      "source": "image",
+      "path": "/glibc/remove.lua"
+    },
+    "glibc/round_num.lua": {
+      "sha256": "34743872f30df3bf331f1c302a0942f9207ab5cc6fcdae8a379dbb66cabd32c1",
+      "size": 87,
+      "source": "image",
+      "path": "/glibc/round_num.lua"
+    },
+    "glibc/sin30.lua": {
+      "sha256": "80e1ea253ffa4c9c9f351bac11d9945c07cff2cd57722afc49c6170b181a5a9c",
+      "size": 72,
+      "source": "image",
+      "path": "/glibc/sin30.lua"
+    },
+    "glibc/sort.lua": {
+      "sha256": "9ff99e844692adb1f3be205d7a2cba0cff304249685dea3471c8b8d341068243",
+      "size": 163,
+      "source": "image",
+      "path": "/glibc/sort.lua"
+    },
+    "glibc/strings.lua": {
+      "sha256": "03c067e1b0d760486d1cc69b6f1397db40e9754e681f6e1e24c124b6a3a107a8",
+      "size": 591,
+      "source": "image",
+      "path": "/glibc/strings.lua"
+    },
+    "judge/judge_busybox.py": {
+      "sha256": "307c6d0325abe22e35c3c3cc27566b41f26598e1e690d7e2a504aadab678d03d",
+      "size": 1413,
+      "source": "judge",
+      "path": "judge/judge_busybox.py"
+    },
+    "judge/judge_lua.py": {
+      "sha256": "b07d38ab9bb12c67d1ef5c9adfcd9012671cdcb1c44f21498c9449f8e1b1634f",
+      "size": 686,
+      "source": "judge",
+      "path": "judge/judge_lua.py"
+    }
+  },
+  "executables": {
+    "musl/busybox": {
+      "sha256": "bc09c5ae5eabf091d0ded0208a17a1173725f10d8b79264d896d09c9553c68de",
+      "size": 1387560,
+      "source": "image",
+      "path": "/musl/busybox"
+    },
+    "musl/lua": {
+      "sha256": "f7bf0f5c7d2cf80dbcc4e8aaee6e7b44621eefc729ff7fac1564ba558890ef95",
+      "size": 476144,
+      "source": "image",
+      "path": "/musl/lua"
+    },
+    "glibc/busybox": {
+      "sha256": "849e80f2625c1f17edde839f649236a5d39ba311c72fdb569d3d6fdbeb676015",
+      "size": 1745480,
+      "source": "image",
+      "path": "/glibc/busybox"
+    },
+    "glibc/lua": {
+      "sha256": "efd551de2331fd848986e90593a5d4bf963bd199695393a21be1d583e511e18b",
+      "size": 880992,
+      "source": "image",
+      "path": "/glibc/lua"
+    }
+  }
+}

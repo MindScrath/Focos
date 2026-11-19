@@ -1,0 +1,42 @@
+{
+  "executables": {},
+  "files": {
+    "glibc-bin.debugfs": {
+      "operation": "ls -p",
+      "path": "/glibc/ltp/testcases/bin",
+      "sha256": "4a5885213f3f19c24a8b1902b39e009dfb4b66c954ef975d00eeb057d2a1ea9f",
+      "size": 113177,
+      "source": "image"
+    },
+    "glibc-ltp_testcode.sh": {
+      "operation": "cat",
+      "path": "/glibc/ltp_testcode.sh",
+      "sha256": "2cd432e52d0f8704198d2ba35716de9172efed3c7fc7f82b2d1945d56380b99d",
+      "size": 483,
+      "source": "image"
+    },
+    "musl-bin.debugfs": {
+      "operation": "ls -p",
+      "path": "/musl/ltp/testcases/bin",
+      "sha256": "77768eebcac7b145fc36b45e80b5d8109c4efa7339962beb6b3bcb5313909f84",
+      "size": 105776,
+      "source": "image"
+    },
+    "musl-ltp_testcode.sh": {
+      "operation": "cat",
+      "path": "/musl/ltp_testcode.sh",
+      "sha256": "dddc3475744e266173cfc7b57de0e51a8b53e3d131508d5f66de05bb5ebb5368",
+      "size": 481,
+      "source": "image"
+    }
+  },
+  "image": {
+    "asset": "sdcard-rv.img.xz",
+    "release": "pre-20250615",
+    "uncompressed_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+    "uncompressed_size": 4294967296,
+    "url": "https://github.com/oscomp/testsuits-for-oskernel/releases/download/pre-20250615/sdcard-rv.img.xz"
+  },
+  "listing_tool": "debugfs 1.47.3 (8-Jul-2025); ls -p stdout, raw bytes",
+  "schema_version": 1
+}

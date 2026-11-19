@@ -1,51 +1,30 @@
-# 选一个 3–6 小时的第一步
+# 任务导航
 
-在 Issue 认领、约 reviewer，再按 [六步 SOP](collaboration.md) 先审 SPEC、写失败测试、实现。负责人、阻塞和完成状态以 Issue 为准；本页只提供任务入口。
+先看 [开放任务](https://github.com/MindScrath/Focos/issues?q=is%3Aissue%20is%3Aopen) 或 [未认领任务](https://github.com/MindScrath/Focos/issues?q=is%3Aissue%20is%3Aopen%20no%3Aassignee)，再按模块找到对应 Issue。负责人、当前进度、依赖、下一步与 SPEC/PR 记录统一维护在 Issue；认领前先读正文及最新讨论。
 
-## 现在可认领的三个小任务
+## 按模块找 Issue
 
-PR #32 的架构约定已经合入，先把以下边界落实到实现与测试。
-
-| 子任务 | 第一份交付 | 对应主任务 |
+| 模块 | 任务入口 | 职责与规格 |
 | --- | --- | --- |
-| [#33 抽离 QEMU 板级配置与启动内存](https://github.com/MindScrath/Focos/issues/33) | 列迁移清单、审 SPEC；保持现有布局和错误行为，回归 BOOT-001/MM-002 | #4 内存，与 #2 对齐板级入口 |
-| [#34 抽取共享块设备契约测试](https://github.com/MindScrath/Focos/issues/34) | 提取写后读与越界测试；先接 MemoryDisk，再保留真实驱动适配入口 | #3 设备，复用已完成的 #1 |
-| [#35 实现可嵌套本核临界区](https://github.com/MindScrath/Focos/issues/35) | 先写 QEMU RISC-V 开/关中断与嵌套状态测试，再实现接口 | #5 进程，与 #2 联调时钟 |
+| 真板启动与设备资源 | [#2 VisionFive2](https://github.com/MindScrath/Focos/issues/2) | 启动、UART、时钟；[PLAT-001](../specs/PLAT-001.md)、[DRV-001](../specs/DRV-001.md) |
+| 块设备与存储驱动 | [#3 SD / QEMU 块设备](https://github.com/MindScrath/Focos/issues/3) | 统一块接口、设备读写与同步；[HAL-001](../specs/HAL-001.md)、[TEST-002](../specs/TEST-002.md) |
+| 内存 | [#4 内存与用户映射](https://github.com/MindScrath/Focos/issues/4) | 页分配、分页、隔离及 mmap；[MM-001](../specs/MM-001.md)、[MM-002](../specs/MM-002.md)、[MM-003](../specs/MM-003.md) |
+| 执行与中断 | [#5 进程、ELF 与管道](https://github.com/MindScrath/Focos/issues/5) · [#35 本核临界区](https://github.com/MindScrath/Focos/issues/35) | 上下文、异常、调度及用户态；[ARCH-001](../specs/ARCH-001.md) |
+| 文件系统与文件接口 | [#6 FAT32](https://github.com/MindScrath/Focos/issues/6) · [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) · [#7 VFS / FD](https://github.com/MindScrath/Focos/issues/7) | 格式行为、路径、文件生命周期及持久化 |
+| 测例与判分 | [#8 测试接入](https://github.com/MindScrath/Focos/issues/8) · [#47 解析 / CLI](https://github.com/MindScrath/Focos/issues/47) · [#48 BusyBox 清单](https://github.com/MindScrath/Focos/issues/48) | 原 11 组与比赛冻结版本 LTP；[TEST-001](../specs/TEST-001.md)、[验证指南](verification.md) |
+| Linux 运行时与网络 | [#23 动态加载、线程与信号](https://github.com/MindScrath/Focos/issues/23) · [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | ABI、阻塞唤醒和程序依赖 |
+| 开发工具 | [#25 vim/gcc/make](https://github.com/MindScrath/Focos/issues/25) | 编辑保存、编译运行、完整与增量构建 |
+| 性能与交付 | [#9 缓存实验](https://github.com/MindScrath/Focos/issues/9) · [#10 材料与提交](https://github.com/MindScrath/Focos/issues/10) | [性能实验](benchmarks.md)、独立复现、证据与许可 |
+| 全国赛扩展 | [#11 LoongArch / 星云板](https://github.com/MindScrath/Focos/issues/11) · [#12 扩展负载](https://github.com/MindScrath/Focos/issues/12) | 第二架构、真板及扩展兼容与检索负载 |
 
-#33/#34 是重构，#35 是新增能力。前两项可用现有基线独立推进；#35 状态测试可先做，关闭任务前还须完成真实定时中断验收。三个任务都不代表整个父任务完成。
+## 接口先找谁确认
 
-已完成的基础：[#1 块设备接口与内存盘](https://github.com/MindScrath/Focos/issues/1) 已关闭；MM-001 页分配与 [PR #31 的 QEMU 真实内存接入](https://github.com/MindScrath/Focos/pull/31) 已合入。继续复用，不重新认领已有实现；真板内存和用户映射仍在 #4 推进。
+平台与设备按 [架构交接](architecture.md) 分工：CPU 机制归 arch，板级资源与装配归 platform，控制器操作归 drivers；公共文件系统通过统一接口使用设备。跨层接口由调用方与实现方共同审阅。
 
-## 基础模块继续往哪里走
+内存与执行接口由 #4/#5 共审；FAT32、Ext4 和 VFS 由 #6/#22/#7 共审。测试失败按实际缺失能力分派给相应模块，测试负责人负责复现与证据，不包办全部内核实现。
 
-| 主任务 | 下一步入口 |
-| --- | --- |
-| [#2 真板启动、UART 与时钟](https://github.com/MindScrath/Focos/issues/2) | 固定平台运行配置并独立冷启动；按板级/驱动边界接自有设备 |
-| [#3 SD 与 QEMU 块设备](https://github.com/MindScrath/Focos/issues/3) | 先读 QEMU 已知扇区；SD 资源调查可并行，共用 #34 的测试逻辑 |
-| [#4 内存与用户映射](https://github.com/MindScrath/Focos/issues/4) | #33 板级迁移；随后按专项 SPEC 推进页表、隔离与 mmap |
-| [#5 进程、ELF 与管道](https://github.com/MindScrath/Focos/issues/5) | #35 临界区及上下文/异常事件 SPEC，再接两任务与用户 ELF |
-| [#6 FAT32](https://github.com/MindScrath/Focos/issues/6) | 内存盘 BPB/簇链测试；真实驱动接入前可先推进格式行为 |
-| [#7 VFS 与文件接口](https://github.com/MindScrath/Focos/issues/7) | 路径、FD 生命周期与共享偏移，不依赖具体板型或控制器 |
+## 怎样开始一次交付
 
-平台任务先读 [架构与接口交接](architecture.md)：#2/#3 对齐 PLAT-001、DRV-001，#4/#5 对齐 ARCH-001。跨层接口由调用方与实现方共同审阅，认领时说明向谁要资源、向谁交接口。
+在 Issue 确认是否可认领，约 reviewer，按 [SPEC 模板](../specs/TEMPLATE.md) 和 [六步 SOP](collaboration.md) 交付一个能验证的行为。规格审定后先写失败测试，再实现、回归并提交 PR；首份交付尽量控制在 3–6 小时。
 
-## 区域赛兼容工作
-
-| 任务 | 第一份交付 |
-| --- | --- |
-| [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 先审 [TEST-001 含 LTP 的规格修订](../specs/TEST-001.md)，再按 A→D 分期交付；当前进度见 Issue |
-| [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) | 镜像特性调查与 host 只读测试 |
-| [#23 动态加载、线程、信号](https://github.com/MindScrath/Focos/issues/23) | 动态 ELF 的解释器/库依赖；架构 ABI 与公共运行时分工 |
-| [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | 一对客户端/服务端收发及超时测试 |
-| [#25 vim/gcc/make](https://github.com/MindScrath/Focos/issues/25) | 工具版本、依赖与终端需求 |
-
-基础运行依赖 #2/#4/#5；文件依赖已完成的 #1 与 #3/#6/#7。Ext4 和运行时调查可提前开始，运行验收要等相关能力接通。#8 的失败结果分派给能力 owner，不由测试负责人包办所有内核实现。
-
-## 实验与全国赛
-
-- [#9 缓存实验](https://github.com/MindScrath/Focos/issues/9)：公共缓存策略、统一预算与统计位置明确后，比较 B0/B1。
-- [#10 提交与教学材料](https://github.com/MindScrath/Focos/issues/10)：独立复现、许可与赛方提交项。
-- [#11 LoongArch 与星云板](https://github.com/MindScrath/Focos/issues/11)：资料可先调查；实现先验 QEMU 架构，再验真板资源与设备。
-- [#12 全国赛扩展](https://github.com/MindScrath/Focos/issues/12)：双平台、当届新增兼容测试、2026 参考负载和真实磁盘检索。
-
-交付边界见 [REGION-001](../specs/REGION-001.md)，检查点见 [路线](roadmap.md)。
+交付范围见 [REGION-001](../specs/REGION-001.md)，阶段与平台顺序见 [路线](roadmap.md)。新增或替代模块入口时维护本页链接；具体任务变化在 Issue 更新。

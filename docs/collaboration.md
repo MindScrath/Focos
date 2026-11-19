@@ -17,7 +17,7 @@
 
 从最新 `upstream/main` 建 `spec/编号-主题`、`feat/编号-主题` 或 `fix/编号-主题`，推到个人 fork。操作命令见 [上手指南](getting-started.md)。一人同时一个实现任务；每周 30 分钟合流演示。
 
-Assignee 是模块 owner；reviewer 与下一步写在 Issue 顶部。owner 维护依赖、SPEC/PR/结果链接，卡住一天就找队友，超过两天拆小或结对。待认领表由 [开放 Issue](https://github.com/MindScrath/Focos/issues) 自动反映，文档不再复制一张进度表。
+Assignee 是模块 owner；reviewer 与下一步写在 Issue 顶部。owner 维护依赖、SPEC/PR/结果链接，卡住一天就找队友，超过两天拆小或结对。认领情况由 [开放 Issue](https://github.com/MindScrath/Focos/issues?q=is%3Aissue%20is%3Aopen) 反映；[任务导航](backlog.md) 只维护模块索引，下一步与进度只在 Issue 更新。
 
 ## 测哪些层
 
