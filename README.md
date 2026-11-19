@@ -176,6 +176,7 @@ Focos/
 │       ├── test001-a0-elf.md          # ELF 链接观察、复现与剩余运行依赖
 │       ├── test001-a0-ltp.md          # LTP 目录/遍历语义与未闭合边界
 │       ├── test001-a0-audit.md        # BusyBox/Lua 输入、差异与未完成边界
+│       ├── test001-lexical-integrity.md # 待审词法重设计：校验先于正常化
 │       ├── test001-analysis-contract.md # 唯一解析路径、两轮教训与 A0–A3 门槛
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
