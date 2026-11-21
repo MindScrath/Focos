@@ -86,3 +86,5 @@
 2026-11-19，Codex 复现 PR #56 新评审：允许SGR分隔非法UTF-8片段时，先删除再解码会把损坏字符修复为合法信息。判断为词法预处理顺序的设计缺口，按负责人要求暂停代码修补，单独重设计原始字节/Unit/Token/合法与损坏分类流水线；未resolve该线程。仅设计变更，矩阵尚未实现验证，需非作者审定后再恢复实现。
 
 2026-11-21，Antigravity（Gemini）按模板起草 [MM-004](../specs/MM-004.md) 及[用户映射参考页](reference/user-mapping.md)，对照已合入的 MM-003 代码（`5a81ce1`）、`scripts/test_vm_api.py` 及固定版本 RISC-V Supervisor 20240411 规范，约定 `KernelBase`、`UserAddressSpace`、`VmArch` 根切换扩展与 `UserAccess` 受控用户拷贝契约，并同步 README 文件树与来源索引。模板、文件树、本地链接锚点、Sv39 位与槽位数值及空白检查通过。本次仅文档草案，未修改内核代码；`make check`、`make vm-smoke` 未运行，新增接口与 `make user-vm-smoke` 均待实现，U 模式执行侧隔离留待 #5 联调验收。作者已审阅草案并确认提交，最终规格及后续实现仍需另外两名非作者成员人工审阅。
+
+2026-11-21，MM-004 规格审阅修订：对照 `kernel/src/arch/vm.rs` 与 `scripts/smoke.py` 逐条修复五项审阅问题——精确修订 `VmArch::map_page`/`unmap_page` 的独占路径与只读共享内核分支前提；统一 `sstatus.SUM` 为每字节单条用户访存指令窗口；为 `KernelBase` 固定板级允许区间并在 `UserAddressSpace::new` 强制子区间校验（拒绝 `[0x1000, 0x2000)`），同时补充 `map_page` 物理页暴露授权约束；改写 `space_a` 回收验收为 4 页逐页撤销（前 3 次保留非空表、第 4 次回收空表）加 `space_b` 非空销毁；为 MM-004 隔离探针、拷贝故障、根切换与保留页记录分配独立日志前缀，避免与 `make vm-smoke` 计数冲突。仅修改规格文档，检查空白、链接锚点与数值一致性通过；未修改代码，仍需另外两名非作者成员审阅。
