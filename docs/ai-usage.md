@@ -85,4 +85,4 @@
 
 2026-11-19，Codex 复现 PR #56 新评审：允许SGR分隔非法UTF-8片段时，先删除再解码会把损坏字符修复为合法信息。判断为词法预处理顺序的设计缺口，按负责人要求暂停代码修补，单独重设计原始字节/Unit/Token/合法与损坏分类流水线；未resolve该线程。仅设计变更，矩阵尚未实现验证，需非作者审定后再恢复实现。
 
-2026-11-21，Antigravity（Gemini）按模板起草 [MM-004](../specs/MM-004.md) 及[用户映射参考页](reference/user-mapping.md)，对照已合入的 MM-003 代码（`5a81ce1`）、`scripts/test_vm_api.py` 及固定版本 RISC-V Supervisor 20240411 规范，约定 `KernelBase`、`UserAddressSpace`、`VmArch` 根切换扩展与 `UserAccess` 受控用户拷贝契约，并同步 README 文件树与来源索引。模板、文件树、本地链接锚点、Sv39 位与槽位数值及空白检查通过。本次仅文档草案，未修改内核代码；`make check`、`make vm-smoke` 未运行，新增接口与 `make user-vm-smoke` 均待实现，U 模式执行侧隔离留待 #5 联调验收。作者已审阅草案并确认提交，最终规格及后续实现仍需另外两名非作者成员人工审阅。
+2026-11-21，Antigravity（Gemini）起草并按审阅修订 [MM-004](../specs/MM-004.md) 及[用户映射参考页](reference/user-mapping.md)，同步 README 文件树与来源索引。仅修改文档，链接锚点、空白及 `scripts/smoke.py` 兼容性检查通过；未改内核，新增接口和 `make user-vm-smoke` 待实现，仍需两名非作者成员审阅。
