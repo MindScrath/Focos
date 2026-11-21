@@ -84,3 +84,5 @@
 2026-11-19，Codex 按负责人反馈及 PR #54 审阅意见，将 backlog 改为稳定模块索引与开放/未认领任务筛选入口，保留 #47/#48 和比赛 LTP 范围；删除与 Issue 重复的进度、待审 PR 和下一步描述。协作 SOP 明确具体任务变化只在 Issue 更新，模块入口变化才维护导航链接。仅修改文档，事实、筛选条件与链接检查见 PR，需一名非作者审阅。
 
 2026-11-19，Codex 复现 PR #56 新评审：允许SGR分隔非法UTF-8片段时，先删除再解码会把损坏字符修复为合法信息。判断为词法预处理顺序的设计缺口，按负责人要求暂停代码修补，单独重设计原始字节/Unit/Token/合法与损坏分类流水线；未resolve该线程。仅设计变更，矩阵尚未实现验证，需非作者审定后再恢复实现。
+
+2026-11-21，Antigravity（Gemini）按模板起草 [MM-004](../specs/MM-004.md) 及[用户映射参考页](reference/user-mapping.md)，对照已合入的 MM-003 代码（`5a81ce1`）、`scripts/test_vm_api.py` 及固定版本 RISC-V Supervisor 20240411 规范，约定 `KernelBase`、`UserAddressSpace`、`VmArch` 根切换扩展与 `UserAccess` 受控用户拷贝契约，并同步 README 文件树与来源索引。模板、文件树、本地链接锚点、Sv39 位与槽位数值及空白检查通过。本次仅文档草案，未修改内核代码；`make check`、`make vm-smoke` 未运行，新增接口与 `make user-vm-smoke` 均待实现，U 模式执行侧隔离留待 #5 联调验收。作者已审阅草案并确认提交，最终规格及后续实现仍需另外两名非作者成员人工审阅。

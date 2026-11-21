@@ -35,7 +35,7 @@
 
 ## 内核分页参考
 
-- [RISC-V 特权规范 20240411：Supervisor](https://docs.riscv.org/reference/isa/v20240411/priv/supervisor.html)：MM-003 的 Sv39、分页切换、地址转换缓存同步及异常语义依据。
+- [RISC-V 特权规范 20240411：Supervisor](https://docs.riscv.org/reference/isa/v20240411/priv/supervisor.html)：MM-003 的 Sv39、分页切换、地址转换缓存同步及异常语义依据；亦为 MM-004 的 `sstatus.SUM`/`MXR`、Sv39 `U` 位与 S 模式取指禁令依据（详见 [MM-004 参考页](reference/user-mapping.md#规范依据)）。
 - [OpenSBI v1.3.1](https://github.com/riscv-software-src/opensbi/tree/v1.3.1)：核对已有 QEMU 环境中的异常转交；具体源码及借鉴范围见 [MM-003 参考页](reference/sv39-paging.md#规范依据)。
 
 - [Rust 内联汇编参考](https://doc.rust-lang.org/reference/inline-assembly.html)：核对寄存器和编译器访存约束；`satp`、`sfence.vma`、`fence.i` 汇编不使用 `nomem`。
