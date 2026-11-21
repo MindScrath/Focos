@@ -115,6 +115,7 @@ Focos/
 │   ├── MM-001.md                      # 页分配与回收
 │   ├── MM-002.md                      # QEMU 真实内存接入规格
 │   ├── MM-003.md                      # QEMU 内核分页与真实访问验收（实现待审阅）
+│   ├── MM-004.md                      # QEMU 用户映射、权限隔离与安全拷贝（草案）
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
@@ -170,6 +171,7 @@ Focos/
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
+│       ├── user-mapping.md            # 用户地址空间、权限隔离与安全拷贝细节
 │       ├── test001-redesign.md         # TEST-001 包、采集和批次契约
 │       ├── test001-a0-lua-samples.md  # 真实语法、包装器边界与复现实验
 │       ├── test001-a0-runtime.md      # 解释器缺口、PATH 与文件生命周期
