@@ -47,18 +47,18 @@ impl MapPerm {
 
 | 操作 | 签名 | 成功与失败状态 |
 | --- | --- | --- |
-| 从已启用的 `KernelAddressSpace` 转交 | `KernelAddressSpace::into_kernel_base(self, allowed_user_range: Range<VirtAddr>) -> Result<KernelBase<M::Page>, (VmError, Self)>` | 仅当对象为 `Active`、CPU 当前根匹配、`test_window` 全部未映射且 `allowed_user_range` 通过架构及窗口不相交校验时，消耗 `self`、结束对 `M`/`A` 的独占借用并返回活动态 `KernelBase`；否则返回 `(Destroyed / InvalidState / InvalidLayout, self)` |
-| 独立创建 | `KernelBase::new<M: VmMemory<Page = P>, A: VmArch>(memory: &mut M, arch: &mut A, layout: KernelLayout, allowed_user_range: Range<VirtAddr>) -> Result<Self, VmError>` | 先执行 MM-003 完整 `KernelLayout` 校验以及 `allowed_user_range` 校验（非法零分配报 `InvalidLayout`），仅建立 `code`/`rodata`/`writable`/`allocatable` 基础恒等映射（不开放 `test_window` 修改），返回未启用态 `KernelBase`；失败回收全部表页 |
+| 从已启用的 `KernelAddressSpace` 转交 | `KernelAddressSpace::into_kernel_base(self, allowed_user_range: Range<VirtAddr>) -> Result<KernelBase<M::Page>, (VmError, Self)>` | 仅当对象为 `Active`、CPU 当前根匹配、`test_window` 全部未映射，且 `arch.valid_user_range(allowed_user_range, &[base_range, test_window])` 通过时，消耗 `self`、结束对 `M`/`A` 的独占借用并返回活动态 `KernelBase`；否则返回 `(Destroyed / InvalidState / InvalidLayout, self)` |
+| 独立创建 | `KernelBase::new<M: VmMemory<Page = P>, A: VmArch>(memory: &mut M, arch: &mut A, layout: KernelLayout, allowed_user_range: Range<VirtAddr>) -> Result<Self, VmError>` | 先执行 MM-003 完整 `KernelLayout` 校验，再调用 `arch.valid_user_range(allowed_user_range, &[base_range, layout.test_window])` 校验允许用户区间（非法零分配报 `InvalidLayout`），仅建立 `code`/`rodata`/`writable`/`allocatable` 基础恒等映射（不开放 `test_window` 修改），返回未启用态 `KernelBase`；失败回收全部表页 |
 | 根与范围查询 | `root(&self) -> PhysAddr`、`base_range(&self) -> Range<VirtAddr>`、`allowed_user_range(&self) -> Range<VirtAddr>` | 只读查询根物理页首、不可变内核基础区间 `[code.start, allocatable.end)` 及板级允许的用户区间 |
 | 查询 | `query<A: VmArch>(&self, arch: &A, va: VirtAddr) -> Result<Option<Translation>, VmError>` | 只读查询；已销毁返回 `Destroyed`，非法地址返回 `InvalidAddress`，发现 `user == true` 返回 `InvalidTable` |
 | 启用 / 停用 | `unsafe fn activate<A: VmArch>(&mut self, arch: &mut A) -> Result<(), VmError>` / `unsafe fn deactivate<A: VmArch>(&mut self, arch: &mut A) -> Result<(), VmError>` | 用于 `KernelBase` 与 Bare 模式间转换；`deactivate` 要求自身为 `Active` 且 CPU 当前根等于 `self.root`（防止未停用的泄漏用户空间绕过停用）；因需 `&mut self`，任何 `UserAddressSpace<'k, P>` 存活时均由编译器禁止调用 |
 | 销毁 | `destroy<M: VmMemory<Page = P>, A: VmArch>(&mut self, memory: &mut M, arch: &A) -> Result<(), VmError>` | 仅销毁 `Inactive` 对象并归还全部内核表页；自身仍为 `Active` 或 CPU 当前根非 `None` 时返回 `ActiveAddressSpace`。因需 `&mut self`，存在任何 `UserAddressSpace` 时由编译器静态禁止 |
 
-`UserAddressSpace<'k, P>` 通过共享借用 `&'k KernelBase<P>` 绑定到唯一内核基础模板，多个 `UserAddressSpace` 可同时存在并共享同一套不可变内核下级页表，而各自独占自身根表与用户侧中间表页（无堆阶段每个用户空间持有的固定表页句柄容量不小于 32 页，足够覆盖根表、L1 与多个用户 L0 表；容量不足与物理页耗尽均报 `Allocator(OutOfMemory)`）：
+`UserAddressSpace<'k, P>` 通过共享借用 `&'k KernelBase<P>` 绑定到唯一内核基础模板，多个 `UserAddressSpace` 可同时存在并共享同一套不可变内核下级页表，而各自独占自身根表与用户侧中间表页。无堆阶段每个用户空间持有的固定表页句柄容量为 32 页（1 张根表 L2 + 1 张中级表 L1 + 最多 30 张 2 MiB 末级表 L0）：**因此本阶段单个 `UserAddressSpace` 实际可同时覆盖的已映射用户内存上限为 30 个不同 2 MiB 区间（≤ 60 MiB；若从 `0x1_0000` 起连续映射则因跳过低 64 KiB 保护区略少 64 KiB）**，而非填满整个 ~1 GiB 虚拟地址范围；超出表页句柄容量与物理页耗尽统一返回 `Allocator(OutOfMemory)`，待后续接入堆分配后再放宽此上限：
 
 | 操作 | 签名 | 成功与失败状态 |
 | --- | --- | --- |
-| 创建 | `UserAddressSpace::new<M: VmMemory<Page = P>, A: VmArch>(kernel: &'k KernelBase<P>, memory: &mut M, arch: &mut A, user_range: Range<VirtAddr>) -> Result<Self, VmError>` | 先校验 `kernel` 未销毁、`user_range` 满足架构校验且完整落于 `kernel.allowed_user_range()` 内（如 QEMU `virt` 拒绝低 64 KiB），再申请 1 张已清零根表并复制内核基础顶层项；失败归还根表，返回未活动对象 |
+| 创建 | `UserAddressSpace::new<M: VmMemory<Page = P>, A: VmArch>(kernel: &'k KernelBase<P>, memory: &mut M, arch: &mut A, user_range: Range<VirtAddr>) -> Result<Self, VmError>` | 先校验 `kernel` 未销毁、`arch.valid_user_range(user_range, &[kernel.base_range()])` 通过且 `user_range` 完整落于 `kernel.allowed_user_range()` 内（因 `allowed_user_range` 已与 `test_window` 顶层槽位分离，子区间自然与 `test_window` 分离，且 QEMU `virt` 拒绝低 64 KiB），再申请 1 张已清零根表并复制内核基础顶层项；失败归还根表，返回未活动对象 |
 | 映射用户页 | `unsafe fn map_page<M: VmMemory<Page = P>, A: VmArch>(&mut self, memory: &mut M, arch: &mut A, va: VirtAddr, pa: PhysAddr, perm: MapPerm) -> Result<(), VmError>` | 仅在 `user_range` 内建立用户页映射，不接管数据页；失败保留旧树并回收本次新表页，活动时同步后返回 |
 | 查询 | `query<A: VmArch>(&self, arch: &A, va: VirtAddr) -> Result<Option<Translation>, VmError>` | 可查询用户区或内核基础区，保留页内偏移并校验权限域；未映射返回 `Ok(None)` |
 | 撤销用户页 | `unsafe fn unmap_page<M: VmMemory<Page = P>, A: VmArch>(&mut self, memory: &mut M, arch: &mut A, va: VirtAddr) -> Result<PageMapping, VmError>` | 仅撤销 `user_range` 内映射；活动时先完成本核同步，再归还空的用户侧中间表页，不释放根表、内核表页或数据页 |
@@ -98,11 +98,12 @@ pub unsafe trait VmArch {
     // ... 保留 MM-003 全部既有方法；map_page/query 现支持全部 supported_leaf() 权限 ...
 
     /// 校验用户虚拟区间：非空、页对齐、下界 >= PAGE_SIZE、不溢出、
-    /// 全部地址为合法用户规范地址，且与 kernel_range 的顶层页表槽位完全分离。
+    /// 全部地址为合法用户规范地址，且与 `reserved` 中每一段保留区间（如内核基础映射
+    /// 与 MM-003 `test_window`）的顶层页表槽位均完全分离；`reserved` 含非法区间亦返回 false。
     fn valid_user_range(
         &self,
         user_range: core::ops::Range<VirtAddr>,
-        kernel_range: core::ops::Range<VirtAddr>,
+        reserved: &[core::ops::Range<VirtAddr>],
     ) -> bool;
 
     /// 将 src_root 中覆盖 kernel_range 的顶层页表项复制到已清零的 dst_root。
@@ -160,7 +161,7 @@ QEMU `virt` 平台在 `kernel/src/platform/qemu_riscv64/memory.rs` 导出 `pub f
 | 虚拟区间 | Sv39 顶层槽位 `VPN[2]` | 用途与权限域 |
 | --- | --- | --- |
 | `[0x0000_0000_0000_0000, 0x0000_0000_0001_0000)` | 0（低 64 KiB） | 空指针保护区；禁止映射，拷贝入口直接返回 `OutsideUserRange` |
-| `[0x0000_0000_0001_0000, 0x0000_0000_4000_0000)` | 0（64 KiB .. 1 GiB） | MM-004 用户虚拟地址范围（`U=1`）；每个用户空间独占 L1/L0 表 |
+| `[0x0000_0000_0001_0000, 0x0000_0000_4000_0000)` | 0（64 KiB .. 1 GiB） | MM-004 允许的用户虚拟地址范围（`U=1`）；各空间独占 L1/L0 表，受无堆 32 页固定表页容量限制，本阶段单空间实际同时映射上限 ≤ 60 MiB（最多 30 张 2 MiB 末级表） |
 | `[0x0000_0000_8020_0000, 0x0000_0000_8800_0000)` 内的内核基础段 | 2（2 GiB .. 3 GiB） | 不可变内核基础恒等映射（`U=0`）；由各用户空间在 L2 槽位只读共享 |
 | `[0xffff_ffc0_0000_0000, 0xffff_ffc0_0000_4000)` | 256（高半区） | MM-003 自检窗口；不复制到 `KernelBase` 或任何 `UserAddressSpace` |
 
@@ -225,7 +226,7 @@ pub unsafe trait UserAccess {
    - **每字节仅在单条用户访存指令前后开关 `SUM`**：
      - `copy_from_user`：循环内先 `csrs sstatus, t_sum` → 单条带标签指令 `focos_copy_from_user_load_pc: lbu t0, 0(a0)` → 紧接 `csrc sstatus, t_sum` 立即清零 `SUM`，之后再在 `SUM=0` 下向内核缓冲区执行 `sb t0, 0(a1)` 及指针递增/分支；
      - `copy_to_user`：循环内先在 `SUM=0` 下从内核缓冲区执行 `lbu t0, 0(a1)`，再 `csrs sstatus, t_sum` → 单条带标签指令 `focos_copy_to_user_store_pc: sb t0, 0(a0)` → 紧接 `csrc sstatus, t_sum` 立即清零 `SUM`，之后再在 `SUM=0` 下执行指针递增/分支。
-   - **故障恢复点强制清零**：因 `sret` 会恢复故障指令触发时保存的 `sstatus`（其中 `SUM=1`），故障恢复标签 `focos_copy_from_user_fault_resume` / `focos_copy_to_user_fault_resume` 首条操作必须立即重装掩码 `0x40000` 并执行 `csrc sstatus, t1` 清零 `SUM` 后再返回。
+   - **故障恢复点强制清零**：因异常入口 `focos_vm_trap_entry`（`fault.S`）在 `sret` 前通过 `csrw sstatus` 从栈帧恢复故障指令触发时保存的 `sstatus`（其中 `SUM=1`；`sret` 本身只按特权规范恢复 `SIE`/`SPIE`/`SPP` 而不改动 `SUM`），故障恢复标签 `focos_copy_from_user_fault_resume` / `focos_copy_to_user_fault_resume` 首条操作必须立即重装掩码 `0x40000` 并执行 `csrc sstatus, t1` 清零 `SUM` 后再返回。
    - 返回 Rust 后立即消费并清空 `RECORD`，并**读回 `sstatus` 断言 `SUM == 0 && MXR == 0`**；若读回不为 0 则立即 panic 关机，绝不带着 `SUM=1` 返回调用者。
 5. **部分拷贝与错误输出语义**：
    - **前置错误**（`Destroyed`、`InvalidState`、`InvalidAddress`、`OutsideUserRange`、`Busy`）：零访存，`dst` 和用户页均原样不变，`SUM` 从未置位。
@@ -241,7 +242,7 @@ pub unsafe trait UserAccess {
 
 | 场景 | 判据 |
 | --- | --- |
-| 用户范围与顶层槽位 | `valid_user_range` 拒绝空区间、不对齐、溢出、非规范地址、高半区地址、包含空页 `[0, 0x1000)` 以及与内核基础区间共享顶层 `VPN[2]` 槽位的区间；`KernelBase` 固定板级允许区间，QEMU `virt` 策略下 `UserAddressSpace::new` 拒绝越出 `[0x1_0000, 0x4000_0000)` 的区间（含 `[0x1000, 0x2000)`、`[0xf000, 0x1_1000)` 与越过 1 GiB 的区间）且零分配 |
+| 用户范围与顶层槽位 | `valid_user_range` 拒绝空区间、不对齐、溢出、非规范地址、高半区地址、包含空页 `[0, 0x1000)` 以及与 `reserved`（内核基础区间或合成布局中的 `test_window`）共享顶层 `VPN[2]` 槽位的区间；`KernelBase::new` 与 `into_kernel_base` 均传入 `&[base_range, test_window]` 校验并固定板级允许区间，QEMU `virt` 策略下 `UserAddressSpace::new` 拒绝越出 `[0x1_0000, 0x4000_0000)` 的区间（含 `[0x1000, 0x2000)`、`[0xf000, 0x1_1000)` 与越过 1 GiB 的区间）且零分配 |
 | `U` 位与权限编码 | 独立读取真实页表字节，核对 `USER_R=0xd3`、`USER_RW=0xd7`、`USER_RX=0xdb`、非叶项 `0x01`（`U=A=D=0`）及内核基础叶项全部 `U=0`；负例将内核叶项置 `U=1` 或用户叶项清 `U=0`，`query` 均返回 `InvalidTable` |
 | 权限与错误优先级 | `KernelAddressSpace` 拒绝 `user: true`，`UserAddressSpace` 拒绝 `user: false`、仅写、仅执行、空权限和 `W+X`；`map_page`/`unmap_page`/`copy_*` 组合错误严格按约定优先级返回 |
 | 内核表共享边界与回收 | 核对修订后的 `VmArch` 共享分支契约：`UserTableView::table_mut` 对内核表页返回 `InvalidTable`，用户 `map_page`/`unmap_page` 不对内核分支调用 `table_mut` 也不将内核表列入 `retired`，向 `spare` 传入已连接内核表页被拒绝；`UserAddressSpace::new` 与 `map_page` 每个表页申请点注入 `OutOfMemory`，前后页数与旧映射不变；同一末级表多页映射时，前几次撤销不提前回收，最后一项撤销才回收空 L0/L1 表，销毁仅释放该空间根表与用户表页，不释放内核表页或数据页 |
@@ -269,9 +270,9 @@ pub unsafe trait UserAccess {
    - `copy_to_user(0x1_1000, src)` 返回 `Fault { kind: StorePage, address: 0x1_1000, copied: 0 }` 且 `Q` 整页未改；
    - 跨页 `copy_from_user(0x1_4ff8, &mut buf16)` 返回 `Fault { kind: LoadPage, address: 0x1_5000, copied: 8 }`，`buf16[..8]` 匹配 `R[0xff8..]`、`buf16[8..]` 全零；跨页 `copy_to_user(0x1_4ff8, &src16)` 返回 `Fault { kind: StorePage, address: 0x1_5000, copied: 8 }`，`R[0xff8..]` 匹配 `src16[..8]`；每次失败后 `SUM` 均读回为 0；全部通过后输出 `FOCOS_USER_VM_COPY_OK`。
 7. **跨空间直切与隔离**：
-   - `space_a.switch_to(&mut space_b, &mut arch)`，核对 `satp` 切至 `space_b.root`；在 `space_b` 读取 `0x1_0000` 得到 `Q` 而非 `P`；写入 `pattern_b` 后核对 `Q` 更新而 `P` 仍为 `pattern_a`；
+   - `space_a.switch_to(&mut space_b, &mut arch)`，核对 `satp` 切至 `space_b.root` 且 `SUM=0`、`MXR=0`；在 `space_b` **经 `copy_from_user(0x1_0000, buf)`** 读回 `Q` 而非 `P`（并可经 `query(0x1_0000)` 交叉核对物理页首，不直接 S 模式访存）；再**经 `copy_to_user(0x1_0000, pattern_b)`** 写入后，以 `Q.with_bytes` 和 `P.with_bytes` 核对 `Q` 已更新而 `P` 仍为 `pattern_a`（每次拷贝后 `SUM` 读回为 0）；
    - 对活动态 `space_b` 调用 `destroy` 返回 `ActiveAddressSpace`；
-   - `space_b.switch_to(&mut space_a, &mut arch)` 切回 `space_a`，确认 `0x1_0000` 仍读到 `pattern_a`；全部通过后输出 `FOCOS_USER_VM_SWITCH_OK`。
+   - `space_b.switch_to(&mut space_a, &mut arch)` 切回 `space_a`，**经 `copy_from_user(0x1_0000, buf)`** 确认 `0x1_0000` 仍读到 `pattern_a` 且 `SUM=0`；全部通过后输出 `FOCOS_USER_VM_SWITCH_OK`。
 8. **逐页撤销、非空销毁与零泄漏回收**：
    - `space_a.deactivate(&mut arch)` 切回 `kernel_base.root()`；
    - 在 `space_a` 依次撤销全部 4 页（`0x1_0000`、`0x1_1000`、`0x1_2000`、`0x1_4000`）：前 3 次撤销后该末级页表仍非空，**核对 `live.get()` 保持不变**（不提前回收非空表）；第 4 次撤销清空末级与中级用户表，**核对 `live.get()` 精确减少 2 页**（仅剩 `space_a` 根表 L2）；
