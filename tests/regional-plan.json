@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-11-18",
-  "kind": "acceptance_plan_not_execution_results",
+  "updated_at": "2026-11-23",
+  "kind": "scope_and_source_reference",
   "spec": "specs/REGION-001.md",
   "required_environment": "qemu-riscv64",
   "libcs": [
@@ -12,107 +12,55 @@
   "branch": "pre-2025",
   "commit": "8b58dd16d26d30f7c74d48d5832d870d3051b703",
   "excluded_groups": [],
-  "case_inventory_status": "PENDING_IMAGE_AND_JUDGE_AUDIT",
-  "case_count": null,
   "groups": [
     {
       "name": "basic",
-      "script": "scripts/basic/basic_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/basic/basic_testcode.sh"
     },
     {
       "name": "busybox",
-      "script": "scripts/busybox/busybox_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/busybox/busybox_testcode.sh"
     },
     {
       "name": "lua",
-      "script": "scripts/lua/lua_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/lua/lua_testcode.sh"
     },
     {
       "name": "libctest",
-      "script": "scripts/libctest/libctest_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/libctest/libctest_testcode.sh"
     },
     {
       "name": "iozone",
-      "script": "scripts/iozone/iozone_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/iozone/iozone_testcode.sh"
     },
     {
       "name": "unixbench",
-      "script": "scripts/unixbench/unixbench_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/unixbench/unixbench_testcode.sh"
     },
     {
       "name": "iperf",
-      "script": "scripts/iperf/iperf_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/iperf/iperf_testcode.sh"
     },
     {
       "name": "libcbench",
-      "script": "scripts/libcbench/libcbench_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/libcbench/libcbench_testcode.sh"
     },
     {
       "name": "lmbench",
-      "script": "scripts/lmbench/lmbench_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/lmbench/lmbench_testcode.sh"
     },
     {
       "name": "netperf",
-      "script": "scripts/netperf/netperf_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/netperf/netperf_testcode.sh"
     },
     {
       "name": "cyclictest",
-      "script": "scripts/cyclictest/cyclictest_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      }
+      "script": "scripts/cyclictest/cyclictest_testcode.sh"
     },
     {
       "name": "ltp",
       "script": "scripts/ltp/ltp_testcode.sh",
-      "status_by_libc": {
-        "musl": "NOT_RUN",
-        "glibc": "NOT_RUN"
-      },
-      "invocation_inventory_status": "PENDING_IMAGE_AND_SCRIPT_AUDIT",
-      "source_directory": "ltp-full-20240524",
-      "case_count": null
+      "source_directory": "ltp-full-20240524"
     }
   ],
   "candidate_images": [
@@ -136,13 +84,9 @@
     "container_digest",
     "judge_revision_match",
     "image_source_script_match",
-    "expanded_case_inventory",
     "tool_ELF_hashes",
     "make_source_version_and_hash",
-    "ltp_image_binary_list_and_hashes",
-    "ltp_invocations_arguments_data_and_dependencies",
-    "ltp_result_adapter_and_acceptance_policy",
-    "ltp_environment_resources_and_static_shards"
+    "official_test_commands_and_runtime_requirements"
   ],
   "tools": {
     "reference_branch": "on-site-final-2025",
@@ -181,6 +125,5 @@
       "role": "CAgent/BuildStorm after regional required target; not replacement"
     }
   ],
-  "profile_id": "regional-2025-with-ltp-v1",
-  "execution_plan_status": "NOT_EXECUTABLE_UNTIL_INPUTS_AND_INVOCATIONS_FROZEN"
+  "note": "Scope and source reference only. Not an executable profile or test result; official image/script/judge version correspondence remains to be verified."
 }
