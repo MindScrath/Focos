@@ -105,6 +105,7 @@ Focos/
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
 │   ├── ARCH-001.md                    # CPU 机制与架构 ABI 边界（本核临界区已实现，待审阅）
+│   ├── ARCH-002.md                    # QEMU 异常与单次定时中断（草案）
 │   ├── PLAT-001.md                    # 板型选择、启动资源与装配（草案）
 │   ├── PLAT-002.md                    # QEMU 板级配置与启动内存迁移
 │   ├── DRV-001.md                     # 设备接入、DMA/IRQ 与错误（草案）
@@ -141,6 +142,7 @@ Focos/
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
+│       ├── trap-timer.md              # 异常入口共存、时钟接口与分阶段验收（草案）
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       ├── user-mapping.md            # 用户地址空间、权限隔离与安全拷贝细节

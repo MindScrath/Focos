@@ -54,3 +54,10 @@
 - [VirtIO 驱动内缓存](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/kernelx/src/driver/block/virtio.rs)、[双架构构建及启动配置](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/build-kernel.sh)：据此补充 FocOS 的公共缓存边界与平台运行配置要求。
 
 本次借鉴设计思路，未引入代码。FocOS 另行明确板级层，保留 HAL-001 的错误及同步语义；早期静态装配，按需扩展。上述源码路径存在不代表两块真板均已验证，本次未运行 KernelX。
+
+## QEMU 异常与时钟规格
+
+- [SBI v2.0 TIME](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/v2.0/src/ext-time.adoc)：绝对期限、清除 pending 与撤销方式。
+- [Devicetree Specification v0.4：DTB 格式](https://github.com/devicetree-org/devicetree-specification/blob/v0.4/source/chapter5-flattened-format.rst)：板级最小频率读取器的编码与边界依据。
+
+以上用于 [ARCH-002](../specs/ARCH-002.md) 设计；沿用 RISC-V 特权规范 20240411，未导入外部实现，运行验收待后续实现。

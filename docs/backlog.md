@@ -9,7 +9,7 @@
 | 真板启动与设备资源 | [#2 VisionFive2](https://github.com/MindScrath/Focos/issues/2) | 启动、UART、时钟；[PLAT-001](../specs/PLAT-001.md)、[DRV-001](../specs/DRV-001.md) |
 | 块设备与存储驱动 | [#3 SD / QEMU 块设备](https://github.com/MindScrath/Focos/issues/3) | 统一块接口、设备读写与同步；[HAL-001](../specs/HAL-001.md)、[TEST-002](../specs/TEST-002.md) |
 | 内存 | [#4 内存与用户映射](https://github.com/MindScrath/Focos/issues/4) | 页分配、分页、隔离及 mmap；[MM-001](../specs/MM-001.md)、[MM-002](../specs/MM-002.md)、[MM-003](../specs/MM-003.md) |
-| 执行与中断 | [#5 进程、ELF 与管道](https://github.com/MindScrath/Focos/issues/5) · [#35 本核临界区](https://github.com/MindScrath/Focos/issues/35) | 上下文、异常、调度及用户态；[ARCH-001](../specs/ARCH-001.md) |
+| 执行与中断 | [#5 进程、ELF 与管道](https://github.com/MindScrath/Focos/issues/5) · [#35 本核临界区](https://github.com/MindScrath/Focos/issues/35) | 上下文、异常、调度及用户态；[ARCH-001](../specs/ARCH-001.md)、[ARCH-002](../specs/ARCH-002.md) |
 | 文件系统与文件接口 | [#6 FAT32](https://github.com/MindScrath/Focos/issues/6) · [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) · [#7 VFS / FD](https://github.com/MindScrath/Focos/issues/7) | 格式行为、路径、文件生命周期及持久化 |
 | 官方测试接入 | [#8 测试接入](https://github.com/MindScrath/Focos/issues/8) · [#48 BusyBox 官方版本核对](https://github.com/MindScrath/Focos/issues/48) | 原 11 组与比赛冻结版本 LTP；[TEST-001](../specs/TEST-001.md)、[验证指南](verification.md) |
 | Linux 运行时与网络 | [#23 动态加载、线程与信号](https://github.com/MindScrath/Focos/issues/23) · [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | ABI、阻塞唤醒和程序依赖 |

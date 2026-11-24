@@ -90,3 +90,5 @@
 2026-11-21，Antigravity（Gemini）起草并按审阅修订 [MM-004](../specs/MM-004.md) 及[用户映射参考页](reference/user-mapping.md)，同步 README 文件树与来源索引。仅修改文档，链接锚点、空白及 `scripts/smoke.py` 兼容性检查通过；未改内核，新增接口和 `make user-vm-smoke` 待实现，仍需两名非作者成员审阅。
 
 2026-11-23，Codex 按负责人要求，在 main 5a81ce1 上独立清理已合并的旧 TEST-001 路线。移除 8 份参考规格/审计说明、4 个审计工具、5 个专用测试文件及 tests/test001 的 47 个输入/样本文件；TEST-001 保留目标与停用说明，历史通过固定 Git 提交查阅。同步 README、任务导航、验证指南、REGION-001 和区域赛范围参考，删除旧分母、PROFILE/CRITERIA、状态与结果适配器要求，保留原 11 组及比赛 LTP、双 libc、来源和工具目标。未修改内核、Makefile、CI 或其保留测试，未引入新入口或新判分实现。自审检查删除引用、文档链接、范围/来源字段与测试集合；移除旧工具专用 43 项 Python 测试，保留的 make check 通过 87 Rust/32 Python/BOOT-001，mm-smoke/irq-smoke/vm-smoke 均通过。未运行比赛测试，不新增兼容成绩；PR 标题和描述待负责人确认后发布。
+
+2026-11-21—24，Codex 起草并按用户转交的 AI 审查意见修订 [ARCH-002](../specs/ARCH-002.md) 与[接口参考](reference/trap-timer.md)，补齐板级最小设备树读取器、显式切换中断的 unsafe 接口、换算例子、来源与导航；复审后明确板级错误映射，删除 HAL 中无触发条件的 `InvalidFrequency`。对照现有启动内存和中断代码核对前提，检查本地链接、接口代码块括号与空白；本次仅文档，未运行 `make check` 或 QEMU smoke。新增接口及固件转交 STIP 的行为仍待实现验证，规格需另外两名成员审阅，尚未发布。
