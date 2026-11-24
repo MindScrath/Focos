@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import smoke
+import user_vm_smoke
 
 
 VM_SYMBOLS = {
@@ -241,6 +242,35 @@ class ResultTests(unittest.TestCase):
                 smoke.validate_result(changed, 0, "user-vm", USER_SYMBOLS)
         with self.assertRaises(ValueError):
             smoke.validate_result(USER_SUCCESS, 1, "user-vm", USER_SYMBOLS)
+
+
+class TrapReturnTests(unittest.TestCase):
+    """检查异常出栈期间的 SUM，覆盖恢复标签清零之前的权限窗口。"""
+
+    saved = bytes.fromhex("83 32 01 10")  # ld t0,256(sp)
+    clear_sum = bytes.fromhex("37 03 04 00 13 43 f3 ff b3 f2 62 00")  # t0 &= ~(1 << 18)
+    write_status = bytes.fromhex("73 90 02 10")  # csrw sstatus,t0
+    pop_ra = bytes.fromhex("a2 60")  # c.ldsp ra,8(sp)
+    sret = bytes.fromhex("73 00 20 10")
+
+    def test_masked_restore_precedes_register_pop_and_sret(self):
+        user_vm_smoke.audit_trap_return(
+            self.saved + self.clear_sum + self.write_status + self.pop_ra + self.sret)
+
+    def test_fault_time_sum_cannot_be_replayed(self):
+        clear_mxr = bytes.fromhex("37 03 08 00") + self.clear_sum[4:]
+        for mask in (b"", clear_mxr):
+            with self.subTest(mask=mask), self.assertRaisesRegex(ValueError, "re-enable SUM"):
+                user_vm_smoke.audit_trap_return(
+                    self.saved + mask + self.write_status + self.pop_ra + self.sret)
+
+    def test_sum_must_stay_clear_until_sret(self):
+        restore = self.saved + self.clear_sum + self.write_status
+        enable_then_clear = bytes.fromhex("73 20 03 10 73 30 03 10")  # csrs/csrc sstatus,t1
+        for tail in (self.write_status + self.sret, enable_then_clear + self.sret,
+                     self.sret + self.write_status + self.sret, b""):
+            with self.subTest(tail=tail), self.assertRaises(ValueError):
+                user_vm_smoke.audit_trap_return(restore + self.pop_ra + tail)
 
 
 class SymbolTests(unittest.TestCase):

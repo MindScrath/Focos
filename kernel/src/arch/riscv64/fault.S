@@ -125,8 +125,15 @@ focos_vm_trap_entry:
     ld t0, 264(sp)
     fscsr t0
 .Lrestore:
+    # 用户拷贝缺页时栈帧里可能保存了 SUM=1。写回前只清这一位，出栈时保持 SUM=0。
+    .option push
+    .option norvc
     ld t0, 256(sp)
+    li t1, 0x40000
+    not t1, t1
+    and t0, t0, t1
     csrw sstatus, t0
+    .option pop
     ld x1, 8(sp)
     ld x3, 24(sp)
     ld x4, 32(sp)
