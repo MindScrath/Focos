@@ -1,10 +1,13 @@
-//! MM-003 公共地址、资源和生命周期接口；不解释硬件页表项。
+//! 公共地址、页权限、资源和生命周期接口；不解释硬件页表项。
 
 use super::{PAGE_SIZE, PageAllocError};
 use core::ops::Range;
 
 mod space;
 pub use space::KernelAddressSpace;
+mod user;
+pub use crate::hal::UserCopyError;
+pub use user::{KernelBase, UserAddressSpace};
 mod memory;
 pub use memory::{IdentityMemory, IdentityPage};
 
@@ -36,7 +39,7 @@ impl VirtAddr {
     }
 }
 
-/// 映射权限；本阶段仅支持内核 R、RW、RX。
+/// 页映射的权限；内核页和用户页分别接受 R、RW、RX。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MapPerm {
     /// 允许读取；本阶段所有合法组合均为 true。
@@ -45,7 +48,7 @@ pub struct MapPerm {
     pub write: bool,
     /// 允许取指；不能与 write 同时为 true。
     pub execute: bool,
-    /// 用户态权限；本阶段必须为 false。
+    /// 叶项属于用户域；内核地址空间不接受此位。
     pub user: bool,
 }
 impl MapPerm {
@@ -66,9 +69,36 @@ impl MapPerm {
         execute: true,
         ..Self::R
     };
+    /// 用户只读、不可执行。
+    pub const USER_R: Self = Self {
+        user: true,
+        ..Self::R
+    };
+    /// 用户读写、不可执行。
+    pub const USER_RW: Self = Self {
+        user: true,
+        ..Self::RW
+    };
+    /// 用户读取和执行、不可写。
+    pub const USER_RX: Self = Self {
+        user: true,
+        ..Self::RX
+    };
+    /// 两个权限域都不支持仅写、仅执行或可写可执行的叶项。
+    pub fn supported_leaf(self) -> bool {
+        self.read && !(self.write && self.execute)
+    }
+    /// 内核映射入口只接受内核叶项。
+    pub fn supported_kernel(self) -> bool {
+        !self.user && self.supported_leaf()
+    }
+    /// 用户映射入口只接受用户叶项。
+    pub fn supported_user(self) -> bool {
+        self.user && self.supported_leaf()
+    }
     /// 不接受用户页、仅写/仅执行或可写可执行页。
     pub fn supported(self) -> bool {
-        self.read && !self.user && !(self.write && self.execute)
+        self.supported_kernel()
     }
 }
 
@@ -119,7 +149,7 @@ pub enum VmError {
     UnalignedAddress,
     /// 修改目标在自检窗口外。
     ProtectedMapping,
-    /// 权限不是内核 R、RW、RX 之一。
+    /// 叶项权限组合或所属权限域不受此入口支持。
     UnsupportedPermissions,
     /// 目标虚拟页已存在映射，禁止覆盖。
     AlreadyMapped,

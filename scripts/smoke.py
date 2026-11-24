@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""验收启动；--mm 检查真实页，--irq 检查中断状态，--vm 检查 MM-003 分页。"""
+"""在 QEMU 中验收启动、物理页、本核中断状态、内核分页和用户映射。"""
 import argparse
 import hashlib
 import pathlib
@@ -7,6 +7,7 @@ import re
 import shlex
 import subprocess
 import sys
+import user_vm_smoke
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ELF = ROOT / "target/riscv64gc-unknown-none-elf/release/focos-kernel"
@@ -14,6 +15,7 @@ LOG = ROOT / "target/evidence/boot-qemu-rv.log"
 MM_LOG = ROOT / "target/evidence/mm-qemu-rv.log"
 IRQ_LOG = ROOT / "target/evidence/irq-qemu-rv.log"
 VM_LOG = ROOT / "target/evidence/vm-qemu-rv.log"
+USER_VM_LOG = ROOT / "target/evidence/user-vm-qemu-rv.log"
 
 # 合同名、必须唯一出现且按顺序排列的成功标记。
 CONTRACTS = {
@@ -27,7 +29,8 @@ CONTRACTS = {
         "FOCOS_VM_OK", "FOCOS_BOOT_OK",
     )),
 }
-LOG_PATHS = {"boot": LOG, "mm": MM_LOG, "irq": IRQ_LOG, "vm": VM_LOG}
+CONTRACTS["user-vm"] = ("MM-004", (*CONTRACTS["vm"][1][:-1], *user_vm_smoke.MARKERS, "FOCOS_BOOT_OK"))
+LOG_PATHS = {"boot": LOG, "mm": MM_LOG, "irq": IRQ_LOG, "vm": VM_LOG, "user-vm": USER_VM_LOG}
 
 
 # 从本次加载的 ELF 取边界和探针位置，不能固定为某一次构建的地址。
@@ -37,7 +40,7 @@ VM_SYMBOL_NAMES = (
 )
 
 
-def load_vm_symbols(elf):
+def load_vm_symbols(elf, names=VM_SYMBOL_NAMES):
     """读取 ELF 符号；缺工具、缺符号、重复或未定义符号都不能验收成功。"""
     try:
         output = subprocess.check_output(["readelf", "--wide", "--symbols", str(elf)],
@@ -47,13 +50,13 @@ def load_vm_symbols(elf):
     symbols = {}
     for line in output.splitlines():
         fields = line.split()
-        if len(fields) != 8 or fields[-1] not in VM_SYMBOL_NAMES:
+        if len(fields) != 8 or fields[-1] not in names:
             continue
         name = fields[-1]
         if fields[6] == "UND" or name in symbols:
             raise ValueError(f"invalid or duplicate ELF symbol: {name}")
         symbols[name] = int(fields[1], 16)
-    if set(symbols) != set(VM_SYMBOL_NAMES):
+    if set(symbols) != set(names):
         raise ValueError("missing VM ELF symbols")
     return symbols
 
@@ -112,6 +115,7 @@ def validate_vm_state(output, symbols):
             or not output.index("FOCOS_VM_LIFECYCLE_OK") < retained[0].start()
             < output.index("FOCOS_VM_OK")):
         raise ValueError("VM retained page evidence mismatch")
+    return start, end, int(cpus[-1].group(2), 16), expected_pages
 
 
 def validate_result(output, returncode, contract="boot", vm_symbols=None):
@@ -132,9 +136,10 @@ def validate_result(output, returncode, contract="boot", vm_symbols=None):
     positions = [lines.index(marker) for marker in markers]
     if positions != sorted(positions):
         raise ValueError(f"{contract} success markers are out of order")
-    if contract == "vm":
-        symbols = load_vm_symbols(ELF) if vm_symbols is None else vm_symbols
-        validate_vm_state(output, symbols)
+    if contract in ("vm", "user-vm"):
+        names = VM_SYMBOL_NAMES + (user_vm_smoke.SYMBOLS if contract == "user-vm" else ())
+        symbols = load_vm_symbols(ELF, names) if vm_symbols is None else vm_symbols
+        state = validate_vm_state(output, symbols)
         events = re.findall(
             r"^FOCOS_VM_FAULT scause=(0x[0-9a-f]+) sepc=(0x[0-9a-f]+) "
             r"stval=(0x[0-9a-f]+)$", output, re.MULTILINE,
@@ -154,6 +159,10 @@ def validate_result(output, returncode, contract="boot", vm_symbols=None):
             if not (output.index(f"FOCOS_VM_{before}_OK") < output.index(record)
                     < output.index(f"FOCOS_VM_{after}_OK")):
                 raise ValueError("page fault records are out of order")
+        if contract == "user-vm":
+            user_vm_smoke.validate(output, symbols, *state)
+            if vm_symbols is None:
+                user_vm_smoke.audit_copy_windows(ELF, symbols)
 
 
 def write_log(path, version, command, output, result):
@@ -218,6 +227,8 @@ def main():
                        help="验收 ARCH-001 本核中断状态保存与恢复")
     group.add_argument("--vm", dest="contract", action="store_const", const="vm",
                        help="验收 MM-003 分页、保护、撤销与生命周期")
+    group.add_argument("--user-vm", dest="contract", action="store_const", const="user-vm",
+                       help="验收 MM-004 用户根切换、权限、拷贝和表页回收")
     parser.set_defaults(contract="boot")
     run_check(parser.parse_args().contract)
 

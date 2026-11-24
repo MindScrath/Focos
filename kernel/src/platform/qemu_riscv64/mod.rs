@@ -2,6 +2,6 @@
 
 mod memory;
 
-pub use memory::MemoryInitError;
+pub use memory::{MemoryInitError, user_address_range};
 #[cfg(focos_platform = "qemu_riscv64")]
 pub use memory::{boot_page_allocator, kernel_layout};

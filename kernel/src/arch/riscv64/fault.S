@@ -40,6 +40,9 @@ focos_vm_trap_entry:
     sd x31, 248(sp)
     csrr t0, sstatus
     sd t0, 256(sp)
+    # Rust、浮点保存及日志路径在正常内核权限下运行。
+    li t1, 0x40000
+    csrc sstatus, t1
     li t1, 0x6000
     and t1, t0, t1
     beqz t1, .Lsaved
@@ -192,3 +195,63 @@ focos_probe_execute_resume:
     addi sp, sp, 16
     ret
 .size focos_probe_execute, .-focos_probe_execute
+
+# a0 用户地址，a1 内核缓冲，a2 长度；a3 只统计已完成字节。
+# 固定宽度便于从验收 ELF 核对开关和唯一访存指令确实相邻。
+.option push
+.option norvc
+.balign 4
+.global focos_copy_from_user
+.type focos_copy_from_user, @function
+focos_copy_from_user:
+    li a3, 0
+    li t1, 0x40000
+    beqz a2, .Lread_done
+.Lread_byte:
+    csrs sstatus, t1
+.global focos_copy_from_user_load_pc
+focos_copy_from_user_load_pc:
+    lbu t0, 0(a0)
+    csrc sstatus, t1
+    sb t0, 0(a1)
+    addi a0, a0, 1
+    addi a1, a1, 1
+    addi a3, a3, 1
+    bne a3, a2, .Lread_byte
+.Lread_done:
+    mv a0, a3
+    ret
+.global focos_copy_from_user_fault_resume
+focos_copy_from_user_fault_resume:
+    li t1, 0x40000
+    csrc sstatus, t1
+    j .Lread_done
+.size focos_copy_from_user, .-focos_copy_from_user
+
+.global focos_copy_to_user
+.type focos_copy_to_user, @function
+focos_copy_to_user:
+    li a3, 0
+    li t1, 0x40000
+    beqz a2, .Lwrite_done
+.Lwrite_byte:
+    lbu t0, 0(a1)
+    csrs sstatus, t1
+.global focos_copy_to_user_store_pc
+focos_copy_to_user_store_pc:
+    sb t0, 0(a0)
+    csrc sstatus, t1
+    addi a0, a0, 1
+    addi a1, a1, 1
+    addi a3, a3, 1
+    bne a3, a2, .Lwrite_byte
+.Lwrite_done:
+    mv a0, a3
+    ret
+.global focos_copy_to_user_fault_resume
+focos_copy_to_user_fault_resume:
+    li t1, 0x40000
+    csrc sstatus, t1
+    j .Lwrite_done
+.size focos_copy_to_user, .-focos_copy_to_user
+.option pop

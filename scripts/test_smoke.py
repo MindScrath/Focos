@@ -38,6 +38,29 @@ FOCOS_VM_OK
 FOCOS_BOOT_OK
 """
 
+USER_SYMBOLS = dict(VM_SYMBOLS, focos_copy_from_user_load_pc=0x80203400,
+                    focos_copy_to_user_store_pc=0x80203450,
+                    focos_copy_from_user_fault_resume=0x80203420,
+                    focos_copy_to_user_fault_resume=0x80203470)
+USER_SUCCESS = SUCCESS.replace("FOCOS_BOOT_OK", """FocOS USER VM CPU: satp=0x8000000000080268 mode=Sv39 asid=0 root=0x80268000
+FOCOS_USER_ISOLATION_FAULT scause=0xd sepc=0x80202000 stval=0x10000
+FOCOS_USER_ISOLATION_FAULT scause=0xf sepc=0x80201000 stval=0x10000
+FOCOS_USER_ISOLATION_FAULT scause=0xc sepc=0x12000 stval=0x12000
+FOCOS_USER_VM_ISOLATION_OK
+FOCOS_USER_COPY_FAULT scause=0xd sepc=0x80203400 stval=0x13000 copied=0
+FOCOS_USER_COPY_FAULT scause=0xf sepc=0x80203450 stval=0x11000 copied=0
+FOCOS_USER_COPY_FAULT scause=0xd sepc=0x80203400 stval=0x15000 copied=8
+FOCOS_USER_COPY_FAULT scause=0xf sepc=0x80203450 stval=0x15000 copied=8
+FOCOS_USER_VM_COPY_OK
+FocOS USER VM CPU: satp=0x8000000000080269 mode=Sv39 asid=0 root=0x80269000
+FocOS USER VM CPU: satp=0x8000000000080268 mode=Sv39 asid=0 root=0x80268000
+FOCOS_USER_VM_SWITCH_OK
+FocOS USER VM CPU: satp=0x8000000000080224 mode=Sv39 asid=0 root=0x80224000
+FocOS USER VM retained table pages: 64
+FOCOS_USER_VM_CLEAN_OK
+FOCOS_USER_VM_OK
+FOCOS_BOOT_OK""")
+
 
 class ResultTests(unittest.TestCase):
     """验证各合同的成功标记、顺序和退出状态；固件版本不作为通过条件。"""
@@ -52,7 +75,7 @@ class ResultTests(unittest.TestCase):
         """启动、内存、中断和分页合同都能从完整输出中取到自己的标记。"""
         for contract in smoke.CONTRACTS:
             with self.subTest(contract=contract):
-                smoke.validate_result(SUCCESS, 0, contract)
+                smoke.validate_result(USER_SUCCESS, 0, contract, USER_SYMBOLS)
 
     def test_boot_only_is_not_memory_or_irq_success(self):
         """旧内核仍能通过启动检查，但不能通过新增专项检查。"""
@@ -72,7 +95,7 @@ class ResultTests(unittest.TestCase):
                                       replacement=replacement):
                         with self.assertRaises(ValueError):
                             smoke.validate_result(
-                                SUCCESS.replace(marker, replacement), 0, contract,
+                                USER_SUCCESS.replace(marker, replacement), 0, contract, USER_SYMBOLS,
                             )
 
     def test_rejects_reversed_success_order(self):
@@ -182,6 +205,43 @@ class ResultTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "status"):
             smoke.validate_result(SUCCESS, 1, "vm")
 
+    def test_user_vm_rejects_old_elf_output_even_after_vm_ok(self):
+        smoke.validate_result(SUCCESS, 0, "vm", VM_SYMBOLS)
+        with self.assertRaisesRegex(ValueError, "FOCOS_USER_VM"):
+            smoke.validate_result(SUCCESS, 0, "user-vm", USER_SYMBOLS)
+
+    def test_user_vm_checks_each_fault_and_its_stage(self):
+        lines = USER_SUCCESS.splitlines()
+        for i, line in enumerate(lines):
+            if not line.startswith(("FOCOS_USER_COPY_FAULT", "FOCOS_USER_ISOLATION_FAULT")):
+                continue
+            bad = [line.replace("scause=0x", "scause=0x1"), line.replace("sepc=0x", "sepc=0x1"),
+                   line.replace("stval=0x", "stval=0x1"), "", line + "\n" + line]
+            if "copied=" in line:
+                bad.append(line.replace("copied=", "copied=1"))
+            for replacement in bad:
+                with self.subTest(line=line, replacement=replacement), self.assertRaises(ValueError):
+                    smoke.validate_result("\n".join([*lines[:i], replacement, *lines[i+1:]]),
+                                          0, "user-vm", USER_SYMBOLS)
+            with self.assertRaises(ValueError):
+                smoke.validate_result(USER_SUCCESS.replace(line + "\n", "") + line + "\n",
+                                      0, "user-vm", USER_SYMBOLS)
+
+    def test_user_vm_checks_all_transitions_and_reclamation(self):
+        cpus = [line for line in USER_SUCCESS.splitlines() if line.startswith("FocOS USER VM CPU")]
+        for changed in [USER_SUCCESS.replace(cpus[0], cpus[1]),
+                        USER_SUCCESS.replace(cpus[3], cpus[1]),
+                        USER_SUCCESS.replace(cpus[1], cpus[0]), USER_SUCCESS.replace(cpus[1], ""),
+                        USER_SUCCESS.replace(cpus[1], cpus[1].replace("asid=0", "asid=1")),
+                        USER_SUCCESS.replace(cpus[1], cpus[1].replace("80269000", "8026a000")),
+                        USER_SUCCESS.replace(cpus[1]+"\n", "") + cpus[1] + "\n",
+                        USER_SUCCESS.replace("USER VM retained table pages: 64", "USER VM retained table pages: 63"),
+                        USER_SUCCESS + "FOCOS_VM_UNEXPECTED", USER_SUCCESS + "FOCOS_PANIC"]:
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                smoke.validate_result(changed, 0, "user-vm", USER_SYMBOLS)
+        with self.assertRaises(ValueError):
+            smoke.validate_result(USER_SUCCESS, 1, "user-vm", USER_SYMBOLS)
+
 
 class SymbolTests(unittest.TestCase):
     """核对 readelf 输出解析和错误传播，不把缺少符号当成跳过验收。"""
@@ -253,15 +313,18 @@ class RunnerTests(unittest.TestCase):
             )
 
     def test_vm_timeout_after_success_fails(self):
-        """分页成功标记之后的超时仍记录失败。"""
-        error = subprocess.TimeoutExpired("qemu", 20, output=SUCCESS.encode())
-        with patch.object(smoke.subprocess, "check_output", return_value="QEMU 8.2.2\n"), \
-                patch.object(smoke.subprocess, "run", side_effect=error), \
-                patch.object(smoke, "write_log") as write_log:
-            with self.assertRaisesRegex(SystemExit, "timed out"):
-                smoke.run_check("vm")
-            self.assertEqual(write_log.call_args.args[0], smoke.VM_LOG)
-            self.assertEqual(write_log.call_args.args[-1], "TIMEOUT")
+        """两个分页专项收到完整标记后若超时，仍各自保存失败日志。"""
+        for contract, log, output in [("vm", smoke.VM_LOG, SUCCESS),
+                                      ("user-vm", smoke.USER_VM_LOG, USER_SUCCESS)]:
+            error = subprocess.TimeoutExpired("qemu", 20, output=output.encode())
+            with self.subTest(contract=contract), \
+                    patch.object(smoke.subprocess, "check_output", return_value="QEMU 8.2.2\n"), \
+                    patch.object(smoke.subprocess, "run", side_effect=error), \
+                    patch.object(smoke, "write_log") as write_log:
+                with self.assertRaisesRegex(SystemExit, "timed out"):
+                    smoke.run_check(contract)
+                self.assertEqual(write_log.call_args.args[0], log)
+                self.assertEqual(write_log.call_args.args[-1], "TIMEOUT")
 
     def test_irq_contract_uses_its_own_log(self):
         """中断专项通过时报告 ARCH-001，并写入独立日志路径。"""
