@@ -60,8 +60,23 @@ def validate(output, symbols, memory_start, memory_end, kernel_root, base_pages)
         raise ValueError("user switch or retained pages outside expected stage")
 
 
+def restores_saved_gpr(insn):
+    """识别 fault.S 从 8*N(sp) 栈槽恢复通用寄存器 xN 的指令。"""
+    if (insn & 0xff07f) == 0x13003:  # ld rd,imm(sp)
+        offset = insn >> 20
+    elif (insn & 0xe003) == 0x6002:  # c.ldsp rd,uimm(sp)
+        # 指令的 [12]、[6:5]、[4:2] 分别保存字节偏移的 [5]、[4:3]、[8:6]。
+        offset = ((insn >> 12) & 1) << 5
+        offset |= ((insn >> 5) & 3) << 3
+        offset |= ((insn >> 2) & 7) << 6
+    else:
+        return False
+    rd = (insn >> 7) & 31
+    return rd != 0 and offset == 8 * rd
+
+
 def audit_trap_return(code):
-    """从实际异常入口走到 sret，检查可能将 SUM 置位的 sstatus 写入。"""
+    """核对异常入口在恢复通用寄存器前写回已清除 SUM 的 sstatus。"""
     # ld t0,256(sp)；li t1,SUM；not t1,t1；and t0,t0,t1；csrw sstatus,t0。
     restore = struct.pack("<5I", 0x10013283, 0x00040337, 0xfff34313, 0x0062f2b3, 0x10029073)
     masked_restore = False
@@ -73,6 +88,8 @@ def audit_trap_return(code):
             break
         insn = int.from_bytes(code[pos:pos + width], "little")
         pos += width
+        if not masked_restore and restores_saved_gpr(insn):
+            raise ValueError("general register restored before sstatus writeback")
         if insn == 0x10200073:  # 此入口的 sret 结束公共返回路径。
             if masked_restore and pos == len(code):
                 return

@@ -253,9 +253,27 @@ class TrapReturnTests(unittest.TestCase):
     pop_ra = bytes.fromhex("a2 60")  # c.ldsp ra,8(sp)
     sret = bytes.fromhex("73 00 20 10")
 
-    def test_masked_restore_precedes_register_pop_and_sret(self):
+    def test_trap_state_reads_may_precede_sstatus_write(self):
+        read_sstatus = bytes.fromhex("92 62")  # c.ldsp t0,256(sp)
+        read_float = bytes.fromhex("07 30 01 11")  # fld ft0,272(sp)
+        read_fcsr = bytes.fromhex("83 32 81 10")  # ld t0,264(sp)
         user_vm_smoke.audit_trap_return(
-            self.saved + self.clear_sum + self.write_status + self.pop_ra + self.sret)
+            read_sstatus + read_float + read_fcsr
+            + self.saved + self.clear_sum + self.write_status + self.pop_ra + self.sret)
+
+    def test_general_register_restores_must_follow_sstatus_write(self):
+        restore_status = self.saved + self.clear_sum + self.write_status
+        loads = (
+            ("c.ldsp ra,8(sp)", self.pop_ra),
+            ("ld ra,8(sp)", bytes.fromhex("83 30 81 00")),
+            ("c.ldsp t6,248(sp)", bytes.fromhex("ee 7f")),
+            ("ld t6,248(sp)", bytes.fromhex("83 3f 81 0f")),
+        )
+        for instruction, load in loads:
+            with self.subTest(instruction=instruction):
+                user_vm_smoke.audit_trap_return(restore_status + load + self.sret)
+                with self.assertRaisesRegex(ValueError, "register restored before sstatus"):
+                    user_vm_smoke.audit_trap_return(load + restore_status + self.sret)
 
     def test_fault_time_sum_cannot_be_replayed(self):
         clear_mxr = bytes.fromhex("37 03 08 00") + self.clear_sum[4:]
