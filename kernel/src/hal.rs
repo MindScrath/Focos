@@ -6,8 +6,9 @@ pub use crate::arch::vm::*;
 
 #[cfg(target_arch = "riscv64")]
 pub use crate::arch::{
-    IrqCheckError, NativeFaultProbe, NativeVmArch, check_local_irq_state, init_vm_arch,
-    install_fault_probe, local_irqs_enabled, probe_return_code, with_local_irqs_disabled,
+    IrqCheckError, NativeFaultProbe, NativeTimer, NativeVmArch, TimerCheckError, check_boot_timer,
+    check_local_irq_state, init_boot_timer, init_vm_arch, install_fault_probe, local_irqs_enabled,
+    probe_return_code, with_local_irqs_disabled,
 };
 
 /// 按字节输出字符串，不申请堆内存。
@@ -42,3 +43,6 @@ impl core::fmt::Write for Console {
 pub fn shutdown(failed: bool) -> ! {
     crate::arch::shutdown(failed)
 }
+
+#[cfg(any(target_arch = "riscv64", test))]
+pub use crate::time::{MonotonicNs, TimerError, TimerSnapshot};

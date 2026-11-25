@@ -6,7 +6,7 @@ pub mod vm;
 pub(crate) mod riscv64;
 #[cfg(target_arch = "riscv64")]
 pub use riscv64::{
-    IrqCheckError, NativeFaultProbe, NativeVmArch, check_local_irq_state, console_putchar,
-    init_vm_arch, install_fault_probe, local_irqs_enabled, probe_return_code, shutdown,
-    with_local_irqs_disabled,
+    IrqCheckError, NativeFaultProbe, NativeTimer, NativeVmArch, TimerCheckError, check_boot_timer,
+    check_local_irq_state, console_putchar, init_boot_timer, init_vm_arch, install_fault_probe,
+    local_irqs_enabled, probe_return_code, shutdown, with_local_irqs_disabled,
 };

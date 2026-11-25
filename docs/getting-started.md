@@ -34,7 +34,7 @@ make check
 
 [MM-002 真实内存接入](../specs/MM-002.md) 另跑 `make mm-smoke`，通过时显示 `PASS: MM-002`。已验证 QEMU 8.2.2 / OpenSBI 1.3.1，以及 Fedora 45 容器中的 QEMU 11.1.3 / OpenSBI 1.8.1；版本不作为精确门禁，机器仍须使用 `virt`、128 MiB、单核和默认固件。实际内存范围、版本、命令和退出结果保存在 `target/evidence/mm-qemu-rv.log`；带 `dirty` 的源码版本表示工作区还有未提交改动。
 
-[ARCH-001 本核临界区](reference/local-irq-critical-section.md) 的 QEMU 状态自检另跑 `make irq-smoke`，通过时显示 `PASS: ARCH-001`。它核对单层/两层闭包和初态开/关，日志在 `target/evidence/irq-qemu-rv.log`；真实定时中断屏蔽仍待 #2/#5 联调，不因本项通过而关闭 #35。
+[ARCH-001 本核临界区](reference/local-irq-critical-section.md) 的 QEMU 状态自检另跑 `make irq-smoke`，通过时显示 `PASS: ARCH-001`。它核对单层/两层闭包和初态开/关，日志在 `target/evidence/irq-qemu-rv.log`；真实定时中断屏蔽另由 `make irq-timer-smoke` 验证，不因单独状态检查通过而关闭 #35。
 
 [MM-003 内核分页](reference/sv39-paging.md) 另跑 `make vm-smoke`，通过时显示 `PASS: MM-003`。它实际启用分页并检查写读、保护异常、撤销、重映射与销毁；原始异常寄存器、根页表和资源数在 `target/evidence/vm-qemu-rv.log`。结果仅覆盖本次 QEMU 环境，不代表用户态隔离或真板分页。
 
@@ -74,11 +74,19 @@ make check
 make mm-smoke
 make irq-smoke
 make vm-smoke
+make timebase-smoke
+make timer-smoke
+make irq-timer-smoke
+make trap-negative-smoke
 ```
 
 完整 QEMU 命令以 [scripts/smoke.py](../scripts/smoke.py) 为准，日志也记录实际命令。布局、页读写、中断状态及成功标记通过只证明当前启动自检，不代表用户程序或文件系统已运行。
 
 构建脚本拒绝其他裸机目标，开发机库测试仍通过 `make test` 运行。若要复现目标拒绝检查，先安装 `rustup target add riscv64imac-unknown-none-elf`，再运行 `cargo build --locked -p focos-kernel --lib --target riscv64imac-unknown-none-elf`；应由构建脚本报告 `unsupported bare-metal target`，缺少工具链不算通过。
+
+`make timebase-smoke` 检查分页前读取的设备树频率与分页后保留值，并对照本次 OpenSBI 的 timer 频率输出。日志为 `target/evidence/timebase-qemu-rv.log`；缺失固件频率、记录不符、非零退出或超时均失败。这只验证时间源配置，不验证定时中断。
+
+`make timer-smoke` 验证三次独立定时事件、全整数与浮点状态恢复；`make irq-timer-smoke` 核对嵌套临界区内 STIP 已挂起但计数不变，退出后按初态处理。`make trap-negative-smoke` 构建两种故意失败的镜像，验证未登记异常和处理器重入的失败出口，最后恢复普通构建。相关日志保存在 `target/evidence/`；两个 `trap-*-test` feature 仅限负例，不用于普通运行。
 
 ## 3. 交第一份 PR
 

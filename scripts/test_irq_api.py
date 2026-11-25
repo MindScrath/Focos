@@ -1,4 +1,4 @@
-"""编译真实 RISC-V 库的调用方，验证启动自检的 unsafe 边界；不运行裸机代码。"""
+"""编译真实 RISC-V 库的调用方，验证启动自检与 DTB 读取的 unsafe 边界；不运行裸机代码。"""
 import json
 import pathlib
 import subprocess
@@ -69,6 +69,40 @@ class IrqApiTests(unittest.TestCase):
             }
         """)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_timebase_reader_requires_unsafe(self):
+        """板级入口需承担真实固件存储的前提，不能由安全代码任意解引用。"""
+        result = self.compile_caller(
+            "pub fn read() { let _ = focos_kernel::platform::boot_timebase_frequency(0); }"
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("E0133", result.stderr)
+        result = self.compile_caller(
+            "pub unsafe fn read() { let _ = unsafe { "
+            "focos_kernel::platform::boot_timebase_frequency(0) }; }"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_timer_operations_and_self_check_require_unsafe(self):
+        """初始化、预约、撤销、显式开关和启动自检均不能由安全调用方执行。"""
+        for body in [
+            "let _ = focos_kernel::hal::init_boot_timer(core::num::NonZeroU32::new(1).unwrap());",
+            "let _ = timer.arm_at(focos_kernel::hal::MonotonicNs(1));",
+            "let _ = timer.cancel();",
+            "let _ = timer.set_boot_irqs_enabled(true);",
+            "let _ = focos_kernel::hal::check_boot_timer(timer);",
+        ]:
+            result = self.compile_caller("pub fn call(timer: &mut focos_kernel::hal::NativeTimer) {" + body + "}")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("E0133", result.stderr)
+            result = self.compile_caller("pub unsafe fn call(timer: &mut focos_kernel::hal::NativeTimer) { unsafe {" + body + "}}")
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_timer_handle_cannot_be_copied_sent_or_shared(self):
+        for bound in ("Copy", "Clone", "Send", "Sync"):
+            result = self.compile_caller("fn require<T: " + bound + ">() {} pub fn check() { require::<focos_kernel::hal::NativeTimer>(); }")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("E0277", result.stderr)
 
 
 if __name__ == "__main__":

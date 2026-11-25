@@ -57,7 +57,11 @@
 
 ## QEMU 异常与时钟规格
 
+- [Rust core::slice::from_raw_parts](https://doc.rust-lang.org/core/slice/fn.from_raw_parts.html)：固件内存转为字节视图时的有效存储、初始化、连续性与借用前提。
 - [SBI v2.0 TIME](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/v2.0/src/ext-time.adoc)：绝对期限、清除 pending 与撤销方式。
 - [Devicetree Specification v0.4：DTB 格式](https://github.com/devicetree-org/devicetree-specification/blob/v0.4/source/chapter5-flattened-format.rst)：板级最小频率读取器的编码与边界依据。
 
-以上用于 [ARCH-002](../specs/ARCH-002.md) 设计；沿用 RISC-V 特权规范 20240411，未导入外部实现，运行验收待后续实现。
+以上用于 [ARCH-002](../specs/ARCH-002.md) 设计与实现；沿用 RISC-V 特权规范 20240411，未导入外部实现。QEMU 验收方式见[异常与时钟参考](reference/trap-timer.md#本次实现与复现)。
+
+- [SBI v2.0 BASE](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/v2.0/src/ext-base.adoc)：启动时探测 TIME 扩展。
+- [SBI v2.0 调用编码](https://github.com/riscv-non-isa/riscv-sbi-doc/blob/v2.0/src/binary-encoding.adoc)：RV64 参数、返回值和寄存器保持约定。

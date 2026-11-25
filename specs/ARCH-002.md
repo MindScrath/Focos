@@ -1,6 +1,6 @@
 # ARCH-002：QEMU 异常与单次定时中断
 
-关联：[#35](https://github.com/MindScrath/Focos/issues/35)、[#5](https://github.com/MindScrath/Focos/issues/5)、[#2](https://github.com/MindScrath/Focos/issues/2) · 状态：草案，待两名成员审阅
+关联：[#35](https://github.com/MindScrath/Focos/issues/35)、[#5](https://github.com/MindScrath/Focos/issues/5)、[#2](https://github.com/MindScrath/Focos/issues/2) · 状态：本分支已实现，待两名成员审阅
 
 ## 要做到什么
 
@@ -21,16 +21,16 @@
 
 SIE 指 `sstatus.SIE` 全局中断允许位；pending 指 `sip.STIP` 定时中断已挂起位。显式切换使用新增的 `NativeTimer::set_boot_irqs_enabled`，安全前提见接口参考。
 
-下列新命令均待实现；host 替身与 QEMU 结果分开记录。
+下列命令已在本分支接入；host 替身与 QEMU 结果分开记录，尚不代表人工验收通过。
 
 | 场景 | 操作或测试入口 | 应看到什么 |
 | --- | --- | --- |
-| 设备树频率 | host：截断、错误魔数、长度/范围溢出、结构错误、缺失/重复/零频率；QEMU 分页前读取 | 明确报错且不越界；只保留频率值，不在分页后解引用设备树 |
+| 设备树频率 | host：截断、错误魔数、长度/范围溢出、结构错误、缺失/重复/零频率；QEMU `make timebase-smoke` 分页前读取 | 明确报错且不越界；只保留频率值，不在分页后解引用设备树 |
 | 接口和失败 | host：时间换算、重复初始化/预约、固件错误、分发错误、计数与超时；RISC-V 调用方编译检查 | 错误可区分，unsafe 边界不可绕过，不伪造处理次数 |
 | 单次定时 | QEMU `make timer-smoke`，连续三次独立预约 | 每次期限到达后计数恰好加一，恢复原 PC/寄存器，无中断风暴，时间不倒退 |
 | 初态开、嵌套 | QEMU `make irq-timer-smoke`：外层关闭中断后预约，在内层等到硬件 pending | 内层与外层退出前计数均不变；退出最外层后恰好处理一次 |
 | 初态关、嵌套 | 同上，但从 SIE=0 进入 | 两层退出后计数仍不变且 pending；显式开中断后恰好处理一次 |
-| 异常与时钟共存 | 时钟前后执行 MM-003 探针；真实异常与寄存器保存专项 | 探针仍按原三项匹配；未知异常失败关机；被打断的整数/浮点值与返回状态不变 |
+| 异常与时钟共存 | 时钟前后执行 MM-003 探针；`make timer-smoke` 寄存器恢复与 `make trap-negative-smoke` 真实异常负例 | 探针仍按原三项匹配；未知异常失败关机；被打断的整数/浮点值与返回状态不变 |
 | 判分与回归 | 新检查器先拒绝旧内核；缺失/重复/乱序标记、非零退出、成功后超时负例；`make check`、`make mm-smoke`、`make irq-smoke`、`make vm-smoke` | 假成功被拒绝，旧验收保持通过；日志与 ELF/源码版本可追溯 |
 
 ## 依据与依赖

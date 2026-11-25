@@ -4,7 +4,7 @@ use crate::hal::{self, FaultProbe};
 use core::{
     arch::{asm, global_asm},
     cell::UnsafeCell,
-    sync::atomic::{AtomicBool, Ordering, compiler_fence},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering, compiler_fence},
 };
 
 global_asm!(include_str!("../fault.S"));
@@ -13,6 +13,12 @@ struct Shared(UnsafeCell<Record>);
 // 不跨汇编操作持有引用。第二个异常在单次记录消费后只能失败关机。
 unsafe impl Sync for Shared {}
 static RECORD: Shared = Shared(UnsafeCell::new(Record::new()));
+// 汇编在保存整数寄存器后置位，恢复前清零；只用于启动 hart。
+#[unsafe(no_mangle)]
+static FOCOS_TRAP_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+pub(crate) fn in_handler() -> bool {
+    FOCOS_TRAP_ACTIVE.load(Ordering::Relaxed) != 0
+}
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 /// 唯一同步异常入口的使用句柄，安装后持有至关机。
 pub struct NativeFaultProbe {
@@ -137,7 +143,27 @@ unsafe impl FaultProbe for NativeFaultProbe {
 
 /// 汇编已保存寄存器和对齐栈，只返回经过匹配的恢复标签。
 #[unsafe(no_mangle)]
-extern "C" fn focos_vm_trap(cause: usize, pc: usize, address: usize) -> usize {
+extern "C" fn focos_vm_trap(cause: usize, pc: usize, address: usize, status: usize) -> usize {
+    #[cfg(feature = "trap-reentry-test")]
+    // SAFETY: 专用负例镜像在守卫已置位后触发二次异常；只能走汇编失败出口。
+    unsafe {
+        asm!("ebreak", options(nostack));
+    }
+    if status & (1 << 8) == 0 || status & 2 != 0 {
+        hal::console_write("FOCOS_TRAP_UNEXPECTED\nFOCOS_PANIC\n");
+        hal::shutdown(true)
+    }
+    if cause & (1usize << 63) != 0 {
+        match super::super::timer::interrupt(cause, pc, status) {
+            Ok(resume) => return resume,
+            Err(error) => {
+                hal::console_write_fmt(format_args!(
+                    "FOCOS_TRAP_UNEXPECTED cause={cause:#x} pc={pc:#x} error={error:?}\nFOCOS_PANIC\n"
+                ));
+                hal::shutdown(true)
+            }
+        }
+    }
     // SAFETY: 同步异常打断探针，探针无活跃记录借用；单核关中断。
     let mut record = unsafe { RECORD.0.get().read_volatile() };
     match record.observe(cause, pc, address) {

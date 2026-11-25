@@ -12,10 +12,13 @@ VM_SYMBOLS = {
     "__code_start": 0x80200000, "__code_end": 0x80208000,
     "__rodata_start": 0x80208000, "__rodata_end": 0x8020a000,
     "__writable_start": 0x8020a000, "__kernel_end": 0x80224000,
+    "focos_timer_context_start": 0x80203000, "focos_timer_context_end": 0x80203400,
     "focos_probe_read_pc": 0x80202000, "focos_probe_write_pc": 0x80201000,
 }
 
 SUCCESS = """OpenSBI v1.3.1
+Platform Timer Device       : aclint-mtimer @ 10000000Hz
+FocOS timebase: 10000000 Hz
 FocOS memory: [0x80224000, 0x87e00000)
 FOCOS_MM_OK
 FOCOS_IRQ_OK
@@ -35,6 +38,23 @@ FocOS VM CPU: satp=0x8000000000080224 mode=Sv39 asid=0 root=0x80224000
 FOCOS_VM_LIFECYCLE_OK
 FocOS VM retained table pages: 64
 FOCOS_VM_OK
+FocOS retained timebase: 10000000 Hz
+FOCOS_TIMER_EVENT n=1 deadline=1000000 observed=1001000
+FOCOS_TIMER_EVENT n=2 deadline=4000000 observed=4001000
+FOCOS_TIMER_EVENT n=3 deadline=7000000 observed=7001000
+FOCOS_TIMER_CONTEXT fp=0 count=4 pc=0x80203000
+FOCOS_TIMER_CONTEXT fp=1 count=5 pc=0x80203004
+FOCOS_TIMER_OK
+FOCOS_IRQ_TIMER initial=1 point=inner count=5 pending=1 sie=0
+FOCOS_IRQ_TIMER initial=1 point=outer count=5 pending=1 sie=0
+FOCOS_IRQ_TIMER initial=1 point=delivered count=6 sie=1
+FOCOS_IRQ_TIMER initial=0 point=inner count=6 pending=1 sie=0
+FOCOS_IRQ_TIMER initial=0 point=outer count=6 pending=1 sie=0
+FOCOS_IRQ_TIMER initial=0 point=exit count=6 pending=1 sie=0
+FOCOS_IRQ_TIMER initial=0 point=delivered count=7 sie=1
+FOCOS_IRQ_TIMER_OK
+FOCOS_VM_FAULT scause=0xd sepc=0x80202000 stval=0xffffffc000000000
+FOCOS_TIMER_VM_OK
 FOCOS_BOOT_OK
 """
 
@@ -258,10 +278,11 @@ class RunnerTests(unittest.TestCase):
         with patch.object(smoke.subprocess, "check_output", return_value="QEMU 8.2.2\n"), \
                 patch.object(smoke.subprocess, "run", side_effect=error), \
                 patch.object(smoke, "write_log") as write_log:
-            with self.assertRaisesRegex(SystemExit, "timed out"):
-                smoke.run_check("vm")
-            self.assertEqual(write_log.call_args.args[0], smoke.VM_LOG)
-            self.assertEqual(write_log.call_args.args[-1], "TIMEOUT")
+            for contract in ("vm", "timebase", "timer", "irq-timer"):
+                with self.assertRaisesRegex(SystemExit, "timed out"):
+                    smoke.run_check(contract)
+                self.assertEqual(write_log.call_args.args[0], smoke.LOG_PATHS[contract])
+                self.assertEqual(write_log.call_args.args[-1], "TIMEOUT")
 
     def test_irq_contract_uses_its_own_log(self):
         """中断专项通过时报告 ARCH-001，并写入独立日志路径。"""
@@ -279,6 +300,62 @@ class RunnerTests(unittest.TestCase):
                 "PASS: ARCH-001 (QEMU emulator version 9.0.0); "
                 f"log: {smoke.IRQ_LOG}"
             )
+
+
+class TimebaseResultTests(unittest.TestCase):
+    """启动频率须与固件观察一致；分页前后值、位置和退出结果均核对。"""
+
+    def test_accepts_firmware_agreement(self):
+        smoke.validate_result(SUCCESS, 0, "timebase")
+
+    def test_rejects_old_kernel(self):
+        old = SUCCESS.replace("FocOS timebase: 10000000 Hz\n", "").replace(
+            "FocOS retained timebase: 10000000 Hz\n", "")
+        with self.assertRaises(ValueError):
+            smoke.validate_result(old, 0, "timebase")
+
+    def test_rejects_missing_duplicate_mismatch_and_out_of_order(self):
+        for line in ("Platform Timer Device       : aclint-mtimer @ 10000000Hz",
+                     "FocOS timebase: 10000000 Hz", "FocOS retained timebase: 10000000 Hz"):
+            for replacement in ("", line + "\n" + line, line.replace("10000000", "0"),
+                                line.replace("10000000", "123"), "prefix " + line):
+                with self.subTest(line=line, replacement=replacement):
+                    with self.assertRaises(ValueError):
+                        smoke.validate_result(SUCCESS.replace(line, replacement), 0, "timebase")
+        line = "FocOS timebase: 10000000 Hz\n"
+        with self.assertRaises(ValueError):
+            smoke.validate_result(SUCCESS.replace(line, "") + line, 0, "timebase")
+
+    def test_rejects_abnormal_exit_and_panic(self):
+        with self.assertRaises(ValueError):
+            smoke.validate_result(SUCCESS, 1, "timebase")
+        with self.assertRaises(ValueError):
+            smoke.validate_result(SUCCESS + "FOCOS_PANIC\n", 0, "timebase")
+
+
+class TimerEvidenceTests(unittest.TestCase):
+    def test_fatal_trap_diagnostics_override_success(self):
+        for marker in ("FOCOS_TRAP_UNEXPECTED", "FOCOS_TRAP_REENTRY"):
+            with self.assertRaises(ValueError):
+                smoke.validate_result(SUCCESS + marker + "\n", 0, "timer", VM_SYMBOLS)
+
+    def test_timer_evidence_is_required_even_with_success_markers(self):
+        for contract in ("timer", "irq-timer"):
+            smoke.validate_result(SUCCESS, 0, contract, VM_SYMBOLS)
+            for line in SUCCESS.splitlines():
+                if line.startswith(("FOCOS_TIMER_EVENT ", "FOCOS_TIMER_CONTEXT ", "FOCOS_IRQ_TIMER ")):
+                    for replacement in ("", line + "\n" + line, "prefix " + line):
+                        with self.subTest(contract=contract, line=line):
+                            with self.assertRaises(ValueError):
+                                smoke.validate_result(SUCCESS.replace(line, replacement), 0, contract, VM_SYMBOLS)
+
+    def test_wrong_counts_pending_pc_and_time_fail(self):
+        for old, new in [("point=inner count=5", "point=inner count=6"),
+                         ("pending=1", "pending=0"), ("point=exit count=6", "point=exit count=7"),
+                         ("pc=0x80203000", "pc=0x80204000"), ("observed=1001000", "observed=999999"),
+                         ("fp=1 count=5", "fp=1 count=6"), ("point=outer count=5 pending=1 sie=0", "point=outer count=5 pending=1 sie=1")]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                smoke.validate_result(SUCCESS.replace(old,new),0,"timer",VM_SYMBOLS)
 
 
 if __name__ == "__main__":

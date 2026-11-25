@@ -17,6 +17,11 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
         "FocOS memory: [{:#x}, {:#x})\n",
         range.start, range.end,
     ));
+    // SAFETY: 唯一启动 hart、SIE=0、Bare；地址来自固定 QEMU 固件，
+    // 固件已交付完整不可变 DTB，分配器已排除其所在页到 RAM 末尾的区域。
+    let timebase = unsafe { focos_kernel::platform::boot_timebase_frequency(dtb_start) }
+        .unwrap_or_else(|error| panic!("timebase initialization failed: {error:?}"));
+    hal::console_write_fmt(format_args!("FocOS timebase: {} Hz\n", timebase.get()));
     // SAFETY: 板级实现已将固件、内核镜像、启动栈、分配标记和设备树排除在可分配范围外。
     // entry.S 已将分页控制寄存器 satp 设为 Bare（地址翻译关闭），此处尚未启用分页，
     // 因而代码使用的地址就是物理地址。按 MM-002 的 128 MiB 配置，可分配页均位于
@@ -43,7 +48,7 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
         .unwrap_or_else(|error| panic!("VM CPU initialization failed: {error:?}"));
     // SAFETY: 布局来自实际链接符号；单核关中断，计数对应此唯一服务。
     // 回调在基础页表建好后安装异常入口；最终空间及探针均持有至关机。
-    let (_address_space, _fault_probe) = unsafe {
+    let (_address_space, mut fault_probe) = unsafe {
         focos_kernel::mm::vm_check::check_paging(
             &mut memory,
             &mut arch,
@@ -60,6 +65,40 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
         live.get()
     ));
     hal::console_write("FOCOS_VM_OK\n");
+    // 分页后只使用已复制的数值，不再访问未映射的 DTB 保留区。
+    hal::console_write_fmt(format_args!(
+        "FocOS retained timebase: {} Hz\n",
+        timebase.get()
+    ));
+    // SAFETY: 唯一启动 hart、SIE=0、sie=0，基础页表和同步入口已经验收并保持有效。
+    let mut timer = unsafe { hal::init_boot_timer(timebase) }
+        .unwrap_or_else(|error| panic!("timer initialization failed: {error:?}"));
+    // SAFETY: 启动流程独占时钟；不在任何临界区内，所有栈/代码/记录均有基础映射。
+    unsafe { hal::check_boot_timer(&mut timer) }
+        .unwrap_or_else(|error| panic!("timer self-test failed: {error:?}"));
+    use hal::FaultProbe;
+    let address = focos_kernel::mm::VirtAddr::from_raw(0xffff_ffc0_0000_0000);
+    let op = hal::ProbeOp::ReadByte { address };
+    let expected = hal::ExpectedFault {
+        kind: hal::FaultKind::LoadPage,
+        address,
+        site: fault_probe.site(&op),
+    };
+    // SAFETY: MM-003 已撤销整个测试窗口，时钟自检已关闭 SIE，基础页表与探针仍持有。
+    let observed = unsafe { fault_probe.probe(op, expected) }
+        .unwrap_or_else(|error| panic!("post-timer page probe failed: {error:?}"));
+    assert_eq!(observed.kind, expected.kind);
+    assert_eq!(observed.address, expected.address);
+    assert_eq!(observed.instruction, expected.site.instruction);
+    hal::console_write("FOCOS_TIMER_VM_OK\n");
+    #[cfg(feature = "trap-unknown-test")]
+    {
+        hal::console_write("FOCOS_TRAP_NEGATIVE_UNKNOWN\n");
+        // SAFETY: 专用负例镜像故意触发未登记异常；入口必须失败关机，不得恢复执行。
+        unsafe {
+            core::arch::asm!("ebreak", options(nostack));
+        }
+    }
     hal::console_write("FocOS: early S-mode boot\nFOCOS_BOOT_OK\n");
     hal::shutdown(false)
 }

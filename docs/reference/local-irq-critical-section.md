@@ -64,3 +64,7 @@ unsafe { asm!("csrsi sstatus, 2", options(nomem, nostack)); }
 - QEMU 结果不代表真板。
 
 依据：RISC-V Privileged Specification 的 `sstatus.SIE` 与 `csrrc`/`csrs`/`csrc` 语义；Rust `core::arch::asm!` 的 `nomem`/`nostack` 选项说明；Rust `core::sync::atomic::compiler_fence` 文档。涉及 HAL 与内存安全，需另外两名成员审阅。
+
+## 真实定时中断联调
+
+本分支按 [ARCH-002](../../specs/ARCH-002.md) 接入 `make irq-timer-smoke`：在嵌套临界区内观察真实 `sip.STIP`，分别验证初态开/关时的处理计数和恢复时机。原 `irq-smoke` 仍只证明状态与嵌套恢复；编译器屏障的静态约束继续保留。实现和 QEMU 结果待两名成员审阅，不能据此推断 SMP 或真板能力。

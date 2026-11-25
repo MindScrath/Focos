@@ -22,9 +22,11 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，并按 [MM-002](specs/MM-002.md) 接入 QEMU 真实内存，完成整页写入、读回、释放和再次分配。运行 `make test` 验证开发机行为，`make mm-smoke` 验证 QEMU 内存自检。用户映射与真板内存接入尚未实现，本阶段仍待队友审阅与验收。
 
-本分支新增可嵌套的本核临界区 `with_local_irqs_disabled`：保存并恢复 RISC-V `sstatus.SIE`，闭包只执行一次并透传返回值。单层/两层与初态开/关由 `make irq-smoke` 的 QEMU 状态自检核对；自检入口为仅限启动期的 `unsafe` 接口，`make test` 编译调用方验证此边界。编译器屏障的静态审阅和负例见[参考页](docs/reference/local-irq-critical-section.md)。真实定时中断屏蔽仍待 #2/#5 的时钟与异常入口联调。
+本分支新增可嵌套的本核临界区 `with_local_irqs_disabled`：保存并恢复 RISC-V `sstatus.SIE`，闭包只执行一次并透传返回值。单层/两层与初态开/关由 `make irq-smoke` 的 QEMU 状态自检核对；自检入口为仅限启动期的 `unsafe` 接口，`make test` 编译调用方验证此边界。编译器屏障的静态审阅和负例见[参考页](docs/reference/local-irq-critical-section.md)。真实定时中断屏蔽由本分支的 `make irq-timer-smoke` 验证，仍待两名成员审阅。
 
 本分支按 [MM-003](specs/MM-003.md) 实现 QEMU 内核 Sv39 分页，新增 `make vm-smoke` 验证非恒等地址写读、只读与不可执行保护、撤销、重映射及页表回收。接口与验收约定见[参考页](docs/reference/sv39-paging.md)，运行方法见[上手指南](docs/getting-started.md)。实现待人工审阅；用户态隔离与真板分页另行验收。
+
+本分支实现 [ARCH-002](specs/ARCH-002.md)：分页前读取 QEMU 设备树频率，共用异常入口接收 SBI 单次定时中断；验证三次预约、整数/浮点寄存器恢复，以及初态开/关的嵌套临界区真实屏蔽。`make timer-smoke`、`make irq-timer-smoke` 和 `make trap-negative-smoke` 分别检查事件、屏蔽及异常失败出口，详见[参考页](docs/reference/trap-timer.md#本次实现与复现)。结果限于 QEMU 单核内核态，尚无调度、用户态或真板时钟。
 
 测试接入目标已调整为提供官方测试入口，沿用比赛对应版本的脚本与原始输出；旧自研解析和判分路线已停用。范围与停用说明见 [TEST-001](specs/TEST-001.md)，后续工作见 [Issue #8](https://github.com/MindScrath/Focos/issues/8)。官方流程核实和新入口仍待完成，参考 Linux 结果不能计为 FocOS 成绩。
 
@@ -78,15 +80,19 @@ Focos/
 │       │   │   ├── space.rs           # 基础映射、窗口、回滚与显式销毁
 │       │   │   └── tests.rs           # 对齐缓冲区、故障注入与所有权测试
 │       │   └── vm_check.rs            # 实际虚拟访问、保护探针和生命周期验收
-│       ├── hal.rs                     # 控制台、中断、分页与同步异常能力入口
+│       ├── time.rs                    # 公共时间单位、错误与有限轮询预算
+│       ├── hal.rs                     # 控制台、中断、分页与时钟能力入口
 │       ├── platform/                  # 板级资源、加载布局与启动装配
 │       │   ├── mod.rs                 # 统一导出当前板型接口
 │       │   └── qemu_riscv64/          # QEMU virt 固定配置
 │       │       ├── mod.rs             # 组织 QEMU 板级实现
 │       │       ├── linker.ld          # QEMU 内核加载地址和段布局
 │       │       ├── memory.rs          # 布局校验、启动页分配与分页布局
-│       │       └── memory/            # 板级内存布局测试
-│       │           └── tests.rs       # 保留区、地址边界与标记容量测试
+│       │       ├── memory/            # 板级内存布局测试
+│       │       │   └── tests.rs       # 保留区、地址边界与标记容量测试
+│       │       ├── timebase.rs        # 有界 DTB 解析与分页前频率读取
+│       │       └── timebase/          # 时间基频读取的开发机验证
+│       │           └── tests.rs       # 格式、错误分类、截断与物理范围负例
 │       └── arch/                      # 与 CPU 架构相关的实现
 │           ├── mod.rs                 # 选择目标架构并导出接口
 │           ├── vm.rs                  # 页表操作与单次异常探针契约
@@ -98,14 +104,21 @@ Focos/
 │               ├── paging/            # 实际页表字节的独立验证
 │               │   └── tests.rs       # 权限、页号、非法项及 CPU/资源失败注入
 │               ├── vm_cpu.rs          # satp 读写、状态校验与本核同步
-│               ├── fault.S            # 寄存器保存、异常返回与探针标签
+│               ├── timer.rs           # SBI TIME、唯一句柄与显式中断开关
+│               ├── timer_model.rs     # 单次事件状态、时间换算与错误传播
+│               ├── timer_model/       # 时钟状态机的 host 故障注入
+│               │   └── tests.rs       # 期限、计数、固件失败及等待预算
+│               ├── timer_check.rs     # 真实事件、寄存器与嵌套屏蔽自检
+│               ├── timer_check.S      # 整数/浮点哨兵和有界中断窗口
+│               ├── timer_check_deadline.rs # 自检短期限预约与过期重试测试
+│               ├── fault.S            # 共用异常入口、寄存器恢复与重入失败出口
 │               ├── fault.rs           # 单次异常匹配器及注入测试
 │               ├── fault/             # 真实异常入口装配
 │               │   └── native.rs      # stvec、固定记录、探针执行与返回代码
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
 │   ├── ARCH-001.md                    # CPU 机制与架构 ABI 边界（本核临界区已实现，待审阅）
-│   ├── ARCH-002.md                    # QEMU 异常与单次定时中断（草案）
+│   ├── ARCH-002.md                    # QEMU 异常与单次定时中断（实现待审阅）
 │   ├── PLAT-001.md                    # 板型选择、启动资源与装配（草案）
 │   ├── PLAT-002.md                    # QEMU 板级配置与启动内存迁移
 │   ├── DRV-001.md                     # 设备接入、DMA/IRQ 与错误（草案）
@@ -120,9 +133,11 @@ Focos/
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
-│   ├── smoke.py                       # 检查启动、物理页、中断状态与分页专项
+│   ├── smoke.py                       # 启动、内存、中断、分页、基频及定时专项
+│   ├── trap_negative.py               # 专用异常负例镜像、失败检查与普通镜像恢复
+│   ├── test_trap_negative.py          # 异常负例判据的反例
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
-│   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
+│   ├── test_irq_api.py                # 编译验证启动接口 unsafe 边界与时钟句柄约束
 │   ├── test_vm_api.py                 # 编译调用方，验证分页借用与 unsafe 边界
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
@@ -142,7 +157,7 @@ Focos/
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
-│       ├── trap-timer.md              # 异常入口共存、时钟接口与分阶段验收（草案）
+│       ├── trap-timer.md              # 异常入口共存、时钟接口与实际验收边界
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       ├── user-mapping.md            # 用户地址空间、权限隔离与安全拷贝细节

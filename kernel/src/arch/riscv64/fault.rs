@@ -92,9 +92,9 @@ fn install_entry(
 #[cfg(target_arch = "riscv64")]
 mod native;
 #[cfg(target_arch = "riscv64")]
-pub(crate) use native::installed;
-#[cfg(target_arch = "riscv64")]
 pub use native::{NativeFaultProbe, install_fault_probe, probe_return_code};
+#[cfg(target_arch = "riscv64")]
+pub(crate) use native::{in_handler, installed};
 
 #[cfg(test)]
 mod tests {

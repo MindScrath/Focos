@@ -7,7 +7,7 @@ use crate::mm::{PAGE_SIZE, PageAllocError, PageAllocator};
 /// QEMU virt 的物理内存起址，低端包含 OpenSBI 保留区。
 const RAM_START: usize = 0x8000_0000;
 /// 128 MiB 配置下物理内存的结束地址，不属于可访问范围。
-const RAM_END: usize = 0x8800_0000;
+pub(super) const RAM_END: usize = 0x8800_0000;
 /// 当前链接脚本约定的内核装载地址。
 const KERNEL_START: usize = 0x8020_0000;
 /// 为整段 RAM 预留标记容量，实际管理范围由内核末尾和设备树限定。
@@ -26,7 +26,10 @@ pub enum MemoryInitError {
 ///
 /// `kernel_end` 必须包含全部内核装载段，`dtb_start` 必须按 8 字节对齐。
 /// 两者须满足 MM-002 的 RAM 边界；越界、溢出或对齐后无完整页返回 `InvalidLayout`。
-fn usable_range(kernel_end: usize, dtb_start: usize) -> Result<Range<usize>, MemoryInitError> {
+pub(super) fn usable_range(
+    kernel_end: usize,
+    dtb_start: usize,
+) -> Result<Range<usize>, MemoryInitError> {
     if kernel_end < KERNEL_START
         || kernel_end >= dtb_start
         || dtb_start >= RAM_END

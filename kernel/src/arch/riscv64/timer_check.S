@@ -1,0 +1,360 @@
+# ARCH-002：pending 已确认后，在受控 SIE 开启点保存/核对全部寄存器。
+.section .text
+.balign 4
+.global focos_timer_context_probe
+.type focos_timer_context_probe, @function
+focos_timer_context_probe:
+    addi sp, sp, -1104
+    sd x5, 40(sp)
+    addi x5, sp, 1104
+    sd x5, 16(sp)
+    sd x1, 8(sp)
+    sd x3, 24(sp)
+    sd x4, 32(sp)
+    sd x6, 48(sp)
+    sd x7, 56(sp)
+    sd x8, 64(sp)
+    sd x9, 72(sp)
+    sd x10, 80(sp)
+    sd x11, 88(sp)
+    sd x12, 96(sp)
+    sd x13, 104(sp)
+    sd x14, 112(sp)
+    sd x15, 120(sp)
+    sd x16, 128(sp)
+    sd x17, 136(sp)
+    sd x18, 144(sp)
+    sd x19, 152(sp)
+    sd x20, 160(sp)
+    sd x21, 168(sp)
+    sd x22, 176(sp)
+    sd x23, 184(sp)
+    sd x24, 192(sp)
+    sd x25, 200(sp)
+    sd x26, 208(sp)
+    sd x27, 216(sp)
+    sd x28, 224(sp)
+    sd x29, 232(sp)
+    sd x30, 240(sp)
+    sd x31, 248(sp)
+    addi t0, sp, 560
+    li t1, 66
+.Lcontext_zero:
+    sd zero, 0(t0)
+    addi t0, t0, 8
+    addi t1, t1, -1
+    bnez t1, .Lcontext_zero
+    sd a0, 528(sp)
+    sd a1, 536(sp)
+    csrr t0, sstatus
+    sd t0, 256(sp)
+    li t1, 0x6000
+    and t1, t0, t1
+    beqz t1, .Lcontext_original_saved
+    frcsr t0
+    sd t0, 264(sp)
+    fsd f0, 272(sp)
+    fsd f1, 280(sp)
+    fsd f2, 288(sp)
+    fsd f3, 296(sp)
+    fsd f4, 304(sp)
+    fsd f5, 312(sp)
+    fsd f6, 320(sp)
+    fsd f7, 328(sp)
+    fsd f8, 336(sp)
+    fsd f9, 344(sp)
+    fsd f10, 352(sp)
+    fsd f11, 360(sp)
+    fsd f12, 368(sp)
+    fsd f13, 376(sp)
+    fsd f14, 384(sp)
+    fsd f15, 392(sp)
+    fsd f16, 400(sp)
+    fsd f17, 408(sp)
+    fsd f18, 416(sp)
+    fsd f19, 424(sp)
+    fsd f20, 432(sp)
+    fsd f21, 440(sp)
+    fsd f22, 448(sp)
+    fsd f23, 456(sp)
+    fsd f24, 464(sp)
+    fsd f25, 472(sp)
+    fsd f26, 480(sp)
+    fsd f27, 488(sp)
+    fsd f28, 496(sp)
+    fsd f29, 504(sp)
+    fsd f30, 512(sp)
+    fsd f31, 520(sp)
+.Lcontext_original_saved:
+    li t0, 0x6000
+    csrc sstatus, t0
+    ld t1, 536(sp)
+    beqz t1, .Lcontext_seed_integer
+    csrs sstatus, t0
+    li t0, 4607182418800017408
+    fmv.d.x f0, t0
+    li t0, 4607182418800017409
+    fmv.d.x f1, t0
+    li t0, 4607182418800017410
+    fmv.d.x f2, t0
+    li t0, 4607182418800017411
+    fmv.d.x f3, t0
+    li t0, 4607182418800017412
+    fmv.d.x f4, t0
+    li t0, 4607182418800017413
+    fmv.d.x f5, t0
+    li t0, 4607182418800017414
+    fmv.d.x f6, t0
+    li t0, 4607182418800017415
+    fmv.d.x f7, t0
+    li t0, 4607182418800017416
+    fmv.d.x f8, t0
+    li t0, 4607182418800017417
+    fmv.d.x f9, t0
+    li t0, 4607182418800017418
+    fmv.d.x f10, t0
+    li t0, 4607182418800017419
+    fmv.d.x f11, t0
+    li t0, 4607182418800017420
+    fmv.d.x f12, t0
+    li t0, 4607182418800017421
+    fmv.d.x f13, t0
+    li t0, 4607182418800017422
+    fmv.d.x f14, t0
+    li t0, 4607182418800017423
+    fmv.d.x f15, t0
+    li t0, 4607182418800017424
+    fmv.d.x f16, t0
+    li t0, 4607182418800017425
+    fmv.d.x f17, t0
+    li t0, 4607182418800017426
+    fmv.d.x f18, t0
+    li t0, 4607182418800017427
+    fmv.d.x f19, t0
+    li t0, 4607182418800017428
+    fmv.d.x f20, t0
+    li t0, 4607182418800017429
+    fmv.d.x f21, t0
+    li t0, 4607182418800017430
+    fmv.d.x f22, t0
+    li t0, 4607182418800017431
+    fmv.d.x f23, t0
+    li t0, 4607182418800017432
+    fmv.d.x f24, t0
+    li t0, 4607182418800017433
+    fmv.d.x f25, t0
+    li t0, 4607182418800017434
+    fmv.d.x f26, t0
+    li t0, 4607182418800017435
+    fmv.d.x f27, t0
+    li t0, 4607182418800017436
+    fmv.d.x f28, t0
+    li t0, 4607182418800017437
+    fmv.d.x f29, t0
+    li t0, 4607182418800017438
+    fmv.d.x f30, t0
+    li t0, 4607182418800017439
+    fmv.d.x f31, t0
+    li t0, 0x61
+    fscsr t0
+.Lcontext_seed_integer:
+    csrr t0, sstatus
+    sd t0, 552(sp)
+    li x1, 4097
+    li x3, 4099
+    li x4, 4100
+    li x5, 4101
+    li x6, 4102
+    li x7, 4103
+    li x8, 4104
+    li x9, 4105
+    li x10, 4106
+    li x11, 4107
+    li x12, 4108
+    li x13, 4109
+    li x14, 4110
+    li x15, 4111
+    li x16, 4112
+    li x17, 4113
+    li x18, 4114
+    li x19, 4115
+    li x20, 4116
+    li x21, 4117
+    li x22, 4118
+    li x23, 4119
+    li x24, 4120
+    li x25, 4121
+    li x26, 4122
+    li x27, 4123
+    li x28, 4124
+    li x29, 4125
+    li x30, 4126
+    li x31, 4127
+    csrsi sstatus, 2
+.global focos_timer_context_start
+focos_timer_context_start:
+    .rept 256
+    nop
+    .endr
+.global focos_timer_context_end
+focos_timer_context_end:
+    csrci sstatus, 2
+    sd x0, 560(sp)
+    sd x1, 568(sp)
+    sd x2, 576(sp)
+    sd x3, 584(sp)
+    sd x4, 592(sp)
+    sd x5, 600(sp)
+    sd x6, 608(sp)
+    sd x7, 616(sp)
+    sd x8, 624(sp)
+    sd x9, 632(sp)
+    sd x10, 640(sp)
+    sd x11, 648(sp)
+    sd x12, 656(sp)
+    sd x13, 664(sp)
+    sd x14, 672(sp)
+    sd x15, 680(sp)
+    sd x16, 688(sp)
+    sd x17, 696(sp)
+    sd x18, 704(sp)
+    sd x19, 712(sp)
+    sd x20, 720(sp)
+    sd x21, 728(sp)
+    sd x22, 736(sp)
+    sd x23, 744(sp)
+    sd x24, 752(sp)
+    sd x25, 760(sp)
+    sd x26, 768(sp)
+    sd x27, 776(sp)
+    sd x28, 784(sp)
+    sd x29, 792(sp)
+    sd x30, 800(sp)
+    sd x31, 808(sp)
+    csrr t0, sstatus
+    sd t0, 1080(sp)
+    ld t0, 536(sp)
+    beqz t0, .Lcontext_copy
+    frcsr t0
+    sd t0, 1072(sp)
+    fsd f0, 816(sp)
+    fsd f1, 824(sp)
+    fsd f2, 832(sp)
+    fsd f3, 840(sp)
+    fsd f4, 848(sp)
+    fsd f5, 856(sp)
+    fsd f6, 864(sp)
+    fsd f7, 872(sp)
+    fsd f8, 880(sp)
+    fsd f9, 888(sp)
+    fsd f10, 896(sp)
+    fsd f11, 904(sp)
+    fsd f12, 912(sp)
+    fsd f13, 920(sp)
+    fsd f14, 928(sp)
+    fsd f15, 936(sp)
+    fsd f16, 944(sp)
+    fsd f17, 952(sp)
+    fsd f18, 960(sp)
+    fsd f19, 968(sp)
+    fsd f20, 976(sp)
+    fsd f21, 984(sp)
+    fsd f22, 992(sp)
+    fsd f23, 1000(sp)
+    fsd f24, 1008(sp)
+    fsd f25, 1016(sp)
+    fsd f26, 1024(sp)
+    fsd f27, 1032(sp)
+    fsd f28, 1040(sp)
+    fsd f29, 1048(sp)
+    fsd f30, 1056(sp)
+    fsd f31, 1064(sp)
+.Lcontext_copy:
+    ld t0, 528(sp)
+    addi t1, sp, 560
+    li t2, 66
+.Lcontext_copy_word:
+    ld t3, 0(t1)
+    sd t3, 0(t0)
+    addi t1, t1, 8
+    addi t0, t0, 8
+    addi t2, t2, -1
+    bnez t2, .Lcontext_copy_word
+    sd sp, 0(t0)
+    ld t1, 552(sp)
+    sd t1, 8(t0)
+    ld t0, 256(sp)
+    li t1, 0x6000
+    and t1, t0, t1
+    beqz t1, .Lcontext_restore_integer
+    csrs sstatus, t1
+    fld f0, 272(sp)
+    fld f1, 280(sp)
+    fld f2, 288(sp)
+    fld f3, 296(sp)
+    fld f4, 304(sp)
+    fld f5, 312(sp)
+    fld f6, 320(sp)
+    fld f7, 328(sp)
+    fld f8, 336(sp)
+    fld f9, 344(sp)
+    fld f10, 352(sp)
+    fld f11, 360(sp)
+    fld f12, 368(sp)
+    fld f13, 376(sp)
+    fld f14, 384(sp)
+    fld f15, 392(sp)
+    fld f16, 400(sp)
+    fld f17, 408(sp)
+    fld f18, 416(sp)
+    fld f19, 424(sp)
+    fld f20, 432(sp)
+    fld f21, 440(sp)
+    fld f22, 448(sp)
+    fld f23, 456(sp)
+    fld f24, 464(sp)
+    fld f25, 472(sp)
+    fld f26, 480(sp)
+    fld f27, 488(sp)
+    fld f28, 496(sp)
+    fld f29, 504(sp)
+    fld f30, 512(sp)
+    fld f31, 520(sp)
+    ld t0, 264(sp)
+    fscsr t0
+.Lcontext_restore_integer:
+    ld t0, 256(sp)
+    csrw sstatus, t0
+    ld x1, 8(sp)
+    ld x3, 24(sp)
+    ld x4, 32(sp)
+    ld x5, 40(sp)
+    ld x6, 48(sp)
+    ld x7, 56(sp)
+    ld x8, 64(sp)
+    ld x9, 72(sp)
+    ld x10, 80(sp)
+    ld x11, 88(sp)
+    ld x12, 96(sp)
+    ld x13, 104(sp)
+    ld x14, 112(sp)
+    ld x15, 120(sp)
+    ld x16, 128(sp)
+    ld x17, 136(sp)
+    ld x18, 144(sp)
+    ld x19, 152(sp)
+    ld x20, 160(sp)
+    ld x21, 168(sp)
+    ld x22, 176(sp)
+    ld x23, 184(sp)
+    ld x24, 192(sp)
+    ld x25, 200(sp)
+    ld x26, 208(sp)
+    ld x27, 216(sp)
+    ld x28, 224(sp)
+    ld x29, 232(sp)
+    ld x30, 240(sp)
+    ld x31, 248(sp)
+    ld sp, 16(sp)
+    ret
+.size focos_timer_context_probe, .-focos_timer_context_probe

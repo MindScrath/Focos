@@ -1,4 +1,4 @@
-# MM-003：直接模式同步入口，所有整数寄存器及启用时的浮点状态均保存。
+# ARCH-002/MM-003：共用直接模式入口，所有整数寄存器及启用时的浮点状态均保存。
 # 544 字节栈帧保持 16 字节对齐；x2 槽保存进入前的 sp。
 .section .text
 .balign 4
@@ -38,6 +38,13 @@ focos_vm_trap_entry:
     sd x29, 232(sp)
     sd x30, 240(sp)
     sd x31, 248(sp)
+    la t0, FOCOS_TRAP_ACTIVE
+    ld t1, 0(t0)
+    bnez t1, .Ltrap_reentered
+    li t1, 1
+    sd t1, 0(t0)
+    csrr t0, sepc
+    sd t0, 528(sp)
     csrr t0, sstatus
     sd t0, 256(sp)
     li t1, 0x6000
@@ -81,8 +88,81 @@ focos_vm_trap_entry:
     csrr a0, scause
     csrr a1, sepc
     csrr a2, stval
+    ld a3, 256(sp)
     call focos_vm_trap
     csrw sepc, a0
+    la t0, FOCOS_CONTEXT_TEST
+    ld t0, 0(t0)
+    beqz t0, .Lcontext_not_testing
+    ld t0, 256(sp)
+    li t1, 0x6000
+    and t1, t0, t1
+    beqz t1, .Lcontext_clobber_integer
+    fscsr zero
+    fmv.d.x f0, zero
+    fmv.d.x f1, zero
+    fmv.d.x f2, zero
+    fmv.d.x f3, zero
+    fmv.d.x f4, zero
+    fmv.d.x f5, zero
+    fmv.d.x f6, zero
+    fmv.d.x f7, zero
+    fmv.d.x f8, zero
+    fmv.d.x f9, zero
+    fmv.d.x f10, zero
+    fmv.d.x f11, zero
+    fmv.d.x f12, zero
+    fmv.d.x f13, zero
+    fmv.d.x f14, zero
+    fmv.d.x f15, zero
+    fmv.d.x f16, zero
+    fmv.d.x f17, zero
+    fmv.d.x f18, zero
+    fmv.d.x f19, zero
+    fmv.d.x f20, zero
+    fmv.d.x f21, zero
+    fmv.d.x f22, zero
+    fmv.d.x f23, zero
+    fmv.d.x f24, zero
+    fmv.d.x f25, zero
+    fmv.d.x f26, zero
+    fmv.d.x f27, zero
+    fmv.d.x f28, zero
+    fmv.d.x f29, zero
+    fmv.d.x f30, zero
+    fmv.d.x f31, zero
+.Lcontext_clobber_integer:
+    li x1, 0
+    li x3, 0
+    li x4, 0
+    li x5, 0
+    li x6, 0
+    li x7, 0
+    li x8, 0
+    li x9, 0
+    li x10, 0
+    li x11, 0
+    li x12, 0
+    li x13, 0
+    li x14, 0
+    li x15, 0
+    li x16, 0
+    li x17, 0
+    li x18, 0
+    li x19, 0
+    li x20, 0
+    li x21, 0
+    li x22, 0
+    li x23, 0
+    li x24, 0
+    li x25, 0
+    li x26, 0
+    li x27, 0
+    li x28, 0
+    li x29, 0
+    li x30, 0
+    li x31, 0
+.Lcontext_not_testing:
     ld t0, 256(sp)
     li t1, 0x6000
     and t1, t0, t1
@@ -124,6 +204,8 @@ focos_vm_trap_entry:
 .Lrestore:
     ld t0, 256(sp)
     csrw sstatus, t0
+    la t0, FOCOS_TRAP_ACTIVE
+    sd zero, 0(t0)
     ld x1, 8(sp)
     ld x3, 24(sp)
     ld x4, 32(sp)
@@ -156,6 +238,27 @@ focos_vm_trap_entry:
     ld x31, 248(sp)
     ld sp, 16(sp)
     sret
+# 嵌套异常不再调用 Rust/格式化；直接请求失败关机，失败时由外部超时兜底。
+.Ltrap_reentered:
+    csrci sstatus, 2
+    csrw sie, zero
+    la t0, .Lreentry_message
+.Lreentry_print:
+    lbu a0, 0(t0)
+    beqz a0, .Lreentry_reset
+    li a7, 1
+    ecall
+    addi t0, t0, 1
+    j .Lreentry_print
+.Lreentry_reset:
+    li a0, 0
+    li a1, 1
+    li a6, 0
+    li a7, 0x53525354
+    ecall
+.Ltrap_stopped:
+    wfi
+    j .Ltrap_stopped
 .size focos_vm_trap_entry, .-focos_vm_trap_entry
 .balign 4
 .global focos_probe_read
@@ -192,3 +295,8 @@ focos_probe_execute_resume:
     addi sp, sp, 16
     ret
 .size focos_probe_execute, .-focos_probe_execute
+
+.pushsection .rodata
+.Lreentry_message:
+    .asciz "FOCOS_TRAP_REENTRY\n"
+.popsection

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""验收启动；--mm 检查真实页，--irq 检查中断状态，--vm 检查 MM-003 分页。"""
+"""验收启动、真实页、中断状态、分页及 --timebase 设备树频率。"""
 import argparse
 import hashlib
 import pathlib
@@ -14,9 +14,17 @@ LOG = ROOT / "target/evidence/boot-qemu-rv.log"
 MM_LOG = ROOT / "target/evidence/mm-qemu-rv.log"
 IRQ_LOG = ROOT / "target/evidence/irq-qemu-rv.log"
 VM_LOG = ROOT / "target/evidence/vm-qemu-rv.log"
+TIMER_LOG = ROOT / "target/evidence/timer-qemu-rv.log"
+IRQ_TIMER_LOG = ROOT / "target/evidence/irq-timer-qemu-rv.log"
+TIMEBASE_LOG = ROOT / "target/evidence/timebase-qemu-rv.log"
 
 # 合同名、必须唯一出现且按顺序排列的成功标记。
 CONTRACTS = {
+    "timer": ("ARCH-002 timer", ("FOCOS_VM_OK", "FOCOS_TIMER_OK", "FOCOS_IRQ_TIMER_OK", "FOCOS_TIMER_VM_OK", "FOCOS_BOOT_OK")),
+    "irq-timer": ("ARCH-002 IRQ masking", ("FOCOS_VM_OK", "FOCOS_TIMER_OK", "FOCOS_IRQ_TIMER_OK", "FOCOS_TIMER_VM_OK", "FOCOS_BOOT_OK")),
+    "timebase": ("ARCH-002 timebase", (
+        "FOCOS_MM_OK", "FOCOS_VM_ENABLED", "FOCOS_VM_OK", "FOCOS_BOOT_OK",
+    )),
     "boot": ("BOOT-001", ("FOCOS_BOOT_OK",)),
     "mm": ("MM-002", ("FOCOS_MM_OK", "FOCOS_BOOT_OK")),
     "irq": ("ARCH-001", ("FOCOS_IRQ_OK", "FOCOS_BOOT_OK")),
@@ -27,13 +35,14 @@ CONTRACTS = {
         "FOCOS_VM_OK", "FOCOS_BOOT_OK",
     )),
 }
-LOG_PATHS = {"boot": LOG, "mm": MM_LOG, "irq": IRQ_LOG, "vm": VM_LOG}
+LOG_PATHS = {"boot": LOG, "mm": MM_LOG, "irq": IRQ_LOG, "vm": VM_LOG, "timebase": TIMEBASE_LOG, "timer": TIMER_LOG, "irq-timer": IRQ_TIMER_LOG}
 
 
 # 从本次加载的 ELF 取边界和探针位置，不能固定为某一次构建的地址。
 VM_SYMBOL_NAMES = (
     "__code_start", "__code_end", "__rodata_start", "__rodata_end",
     "__writable_start", "__kernel_end", "focos_probe_read_pc", "focos_probe_write_pc",
+    "focos_timer_context_start", "focos_timer_context_end",
 )
 
 
@@ -85,7 +94,7 @@ def validate_vm_state(output, symbols):
             or tuple(int(value, 16) for value in memory[0]) != (start, end)
             or not 0x80000000 <= ranges[0][0] < end <= 0x88000000):
         raise ValueError("VM layout does not match managed RAM")
-    for name in VM_SYMBOL_NAMES[-2:]:
+    for name in VM_SYMBOL_NAMES[6:8]:
         if not ranges[0][0] <= symbols[name] < ranges[0][1] or symbols[name] % 2:
             raise ValueError("VM probe symbol outside code")
     cpus = list(re.finditer(
@@ -120,6 +129,8 @@ def validate_result(output, returncode, contract="boot", vm_symbols=None):
         raise ValueError(f"QEMU exited with status {returncode}")
     if "FOCOS_PANIC" in output:
         raise ValueError("kernel reported FOCOS_PANIC")
+    if "FOCOS_TRAP_UNEXPECTED" in output or "FOCOS_TRAP_REENTRY" in output:
+        raise ValueError("kernel reported fatal trap")
     if "FOCOS_VM_UNEXPECTED" in output:
         raise ValueError("kernel reported FOCOS_VM_UNEXPECTED")
 
@@ -132,6 +143,13 @@ def validate_result(output, returncode, contract="boot", vm_symbols=None):
     positions = [lines.index(marker) for marker in markers]
     if positions != sorted(positions):
         raise ValueError(f"{contract} success markers are out of order")
+    if contract == "timebase":
+        validate_timebase(output)
+    if contract in ("timer", "irq-timer"):
+        symbols = load_vm_symbols(ELF) if vm_symbols is None else vm_symbols
+        validate_timer(output, symbols)
+        validate_irq_timer(output)
+        validate_post_timer_fault(output, symbols)
     if contract == "vm":
         symbols = load_vm_symbols(ELF) if vm_symbols is None else vm_symbols
         validate_vm_state(output, symbols)
@@ -142,8 +160,8 @@ def validate_result(output, returncode, contract="boot", vm_symbols=None):
         expected = ((15, 0xffffffc000001000, symbols["focos_probe_write_pc"]),
                     (12, 0xffffffc000002000, 0xffffffc000002000),
                     (13, 0xffffffc000000000, symbols["focos_probe_read_pc"]))
-        if len(events) != 3 or output.count("FOCOS_VM_FAULT") != 3:
-            raise ValueError("expected exactly three raw page fault records")
+        if len(events) != 4 or output.count("FOCOS_VM_FAULT") != 4:
+            raise ValueError("expected exactly four raw page fault records")
         for event, (cause, address, expected_pc), before, after in zip(
                 events, expected, ("ALIAS", "READONLY", "NOEXEC"),
                 ("READONLY", "NOEXEC", "UNMAP")):
@@ -154,6 +172,87 @@ def validate_result(output, returncode, contract="boot", vm_symbols=None):
             if not (output.index(f"FOCOS_VM_{before}_OK") < output.index(record)
                     < output.index(f"FOCOS_VM_{after}_OK")):
                 raise ValueError("page fault records are out of order")
+
+        validate_post_timer_fault(output, symbols)
+
+
+def validate_timebase(output):
+    """用固件打印的 timer 频率对照内核读取值，核对分页前后各一次观察。"""
+    prefixes = ("Platform Timer Device", "FocOS timebase:", "FocOS retained timebase:")
+    patterns = (r"^Platform Timer Device +: [^\r\n]+ @ ([0-9]+)Hz$",
+                r"^FocOS timebase: ([0-9]+) Hz$",
+                r"^FocOS retained timebase: ([0-9]+) Hz$")
+    observations = []
+    for prefix, pattern in zip(prefixes, patterns):
+        records = list(re.finditer(pattern, output, re.MULTILINE))
+        if len(records) != 1 or output.count(prefix) != 1:
+            raise ValueError(f"expected exactly one timebase observation: {prefix}")
+        observations.append(records[0])
+    frequencies = [int(record.group(1)) for record in observations]
+    if not 0 < frequencies[0] <= 0xffffffff or len(set(frequencies)) != 1:
+        raise ValueError("timebase frequency disagrees with firmware or retained value")
+    firmware, before, after = [record.start() for record in observations]
+    if not (firmware < before < output.index("FOCOS_MM_OK")
+            < output.index("FOCOS_VM_ENABLED") < output.index("FOCOS_VM_OK")
+            < after < output.index("FOCOS_BOOT_OK")):
+        raise ValueError("timebase observations are out of order")
+
+
+def validate_post_timer_fault(output, symbols):
+    """时钟事件后必须再经过同一分页探针，实际异常三元组仍匹配。"""
+    tail = output[output.index("FOCOS_IRQ_TIMER_OK"):]
+    record = (f"FOCOS_VM_FAULT scause=0xd sepc={symbols['focos_probe_read_pc']:#x} "
+              "stval=0xffffffc000000000")
+    if tail.splitlines().count(record) != 1 or tail.count("FOCOS_VM_FAULT") != 1:
+        raise ValueError("post-timer fault mismatch")
+    if not tail.index(record) < tail.index("FOCOS_TIMER_VM_OK") < tail.index("FOCOS_BOOT_OK"):
+        raise ValueError("post-timer fault order")
+
+
+def validate_timer(output, symbols):
+    """独立核对三次期限/观察、两个上下文计数和实际 ELF 中的被打断窗口。"""
+    events = list(re.finditer(r"^FOCOS_TIMER_EVENT n=(\d+) deadline=(\d+) observed=(\d+)$", output, re.MULTILINE))
+    if len(events) != 3 or output.count("FOCOS_TIMER_EVENT") != 3:
+        raise ValueError("expected three timer events")
+    previous_time = 0
+    previous_position = output.index("FOCOS_VM_OK")
+    for n, event in enumerate(events, 1):
+        actual, deadline, observed = map(int, event.groups())
+        if actual != n or not previous_time < deadline <= observed <= 0xffffffffffffffff:
+            raise ValueError("timer deadline or sequence mismatch")
+        if not previous_position < event.start() < output.index("FOCOS_TIMER_OK"):
+            raise ValueError("timer event order")
+        previous_time, previous_position = observed, event.start()
+    contexts = list(re.finditer(r"^FOCOS_TIMER_CONTEXT fp=([01]) count=(\d+) pc=(0x[0-9a-f]+)$", output, re.MULTILINE))
+    if len(contexts) != 2 or output.count("FOCOS_TIMER_CONTEXT") != 2:
+        raise ValueError("expected two context records")
+    for mode, record in enumerate(contexts):
+        fp, count, pc = record.groups()
+        pc = int(pc, 16)
+        if (int(fp) != mode or int(count) != 4 + mode or pc % 2
+                or not symbols["focos_timer_context_start"] <= pc <= symbols["focos_timer_context_end"]):
+            raise ValueError("context record mismatch")
+        if not previous_position < record.start() < output.index("FOCOS_TIMER_OK"):
+            raise ValueError("context record order")
+        previous_position = record.start()
+
+
+def validate_irq_timer(output):
+    """逐点核对初态开/关时的计数、硬件 pending 和 SIE，不接受只有总成功。"""
+    expected = [
+        "FOCOS_IRQ_TIMER initial=1 point=inner count=5 pending=1 sie=0",
+        "FOCOS_IRQ_TIMER initial=1 point=outer count=5 pending=1 sie=0",
+        "FOCOS_IRQ_TIMER initial=1 point=delivered count=6 sie=1",
+        "FOCOS_IRQ_TIMER initial=0 point=inner count=6 pending=1 sie=0",
+        "FOCOS_IRQ_TIMER initial=0 point=outer count=6 pending=1 sie=0",
+        "FOCOS_IRQ_TIMER initial=0 point=exit count=6 pending=1 sie=0",
+        "FOCOS_IRQ_TIMER initial=0 point=delivered count=7 sie=1",
+    ]
+    actual = [line for line in output.splitlines() if "FOCOS_IRQ_TIMER " in line]
+    if actual != expected:
+        raise ValueError("IRQ timer observations mismatch")
+    if not output.index("FOCOS_TIMER_OK") < output.index(expected[0]) < output.index(expected[-1]) < output.index("FOCOS_IRQ_TIMER_OK"):
+        raise ValueError("IRQ timer observations order")
 
 
 def write_log(path, version, command, output, result):
@@ -218,6 +317,10 @@ def main():
                        help="验收 ARCH-001 本核中断状态保存与恢复")
     group.add_argument("--vm", dest="contract", action="store_const", const="vm",
                        help="验收 MM-003 分页、保护、撤销与生命周期")
+    group.add_argument("--timebase", dest="contract", action="store_const", const="timebase",
+                       help="验收 ARCH-002 设备树时间基频与分页后保留值")
+    group.add_argument("--timer", dest="contract", action="store_const", const="timer", help="验收单次定时及上下文恢复")
+    group.add_argument("--irq-timer", dest="contract", action="store_const", const="irq-timer", help="验收真实待处理中断屏蔽")
     parser.set_defaults(contract="boot")
     run_check(parser.parse_args().contract)
 

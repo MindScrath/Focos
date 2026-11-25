@@ -4,6 +4,6 @@
 mod qemu_riscv64;
 
 #[cfg(any(focos_platform = "qemu_riscv64", test))]
-pub use qemu_riscv64::MemoryInitError;
+pub use qemu_riscv64::{MemoryInitError, TimebaseError, parse_timebase_frequency};
 #[cfg(focos_platform = "qemu_riscv64")]
-pub use qemu_riscv64::{boot_page_allocator, kernel_layout};
+pub use qemu_riscv64::{boot_page_allocator, boot_timebase_frequency, kernel_layout};

@@ -7,3 +7,6 @@ pub mod block;
 pub mod hal;
 pub mod mm;
 pub mod platform;
+
+#[cfg(any(target_arch = "riscv64", test))]
+pub mod time;

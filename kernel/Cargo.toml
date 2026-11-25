@@ -9,3 +9,8 @@ name = "focos-kernel"
 path = "src/main.rs"
 test = false
 bench = false
+
+# 仅用于失败路径验收；启用后内核必须失败退出，不作为普通运行配置。
+[features]
+trap-unknown-test = []
+trap-reentry-test = []
