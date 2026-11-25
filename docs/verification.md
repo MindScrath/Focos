@@ -16,8 +16,8 @@
 
 ## 接入顺序
 
-1. **核实官方流程。** 对照比赛版本确认测试源码、镜像、脚本、运行环境及官方判分方式，已知 BusyBox 版本差异由 [#48](https://github.com/MindScrath/Focos/issues/48) 跟踪。目前只有范围和来源参考，尚未提供比赛测试入口。
-2. **提供运行入口。** 按确认后的官方方式准备依赖并执行，保留原始输出和实际运行条件；启动失败、超时、中断必须可见，结束后清理进程。具体入口待新 SPEC 审阅后实现。
+1. **核实官方流程。** 对照比赛版本确认测试源码、镜像、脚本、运行环境及官方判分方式，已知 BusyBox 版本差异由 [#48](https://github.com/MindScrath/Focos/issues/48) 跟踪。
+2. **提供运行入口。** 在仓库根目录执行 `python3 scripts/official_test.py --image /绝对路径/sdcard-rv.img --out target/official/run-001`，选择新的输出目录。串口原文见 `serial.log`，运行条件及结束原因见 `run.json`。依赖与镜像下载见[运行说明](reference/official-test-entry.md#在仓库运行)。
 3. **验证内核兼容。** 在 FocOS 上运行规定范围的原版测试，musl/glibc 分开记录。沿用对应版本的官方判分工具；没有工具时按官方标准核对，不自行生成通过率。参考 Linux 仅用于检查环境和运行方式。
 4. **接工具演示。** 2025 原版 vim/gcc，加已锁定来源的 make；编辑、构建、执行并检查磁盘副作用。版本输出只是加载检查。
 
