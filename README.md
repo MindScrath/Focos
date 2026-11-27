@@ -122,6 +122,7 @@ Focos/
 │   ├── MM-002.md                      # QEMU 真实内存接入规格
 │   ├── MM-003.md                      # QEMU 内核分页与真实访问验收（实现待审阅）
 │   ├── MM-004.md                      # QEMU 用户映射、权限隔离与安全拷贝（草案）
+│   ├── MM-005.md                      # 用户匿名映射与堆顶管理（草案）
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
@@ -152,6 +153,7 @@ Focos/
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       ├── user-mapping.md            # 用户地址空间、权限隔离与安全拷贝细节
+│       ├── anon-memory.md             # 匿名映射、堆页回收与验收例子
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
