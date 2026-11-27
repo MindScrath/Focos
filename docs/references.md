@@ -44,6 +44,11 @@
 
 以上资料用于 MM-003 的设计约定，未引入外部实现代码。运行证据由实现 PR 提供。
 
+## 匿名映射与堆顶
+
+- [MM-005](../specs/MM-005.md) 的匿名页初始清零、内核选址、按页撤销及空洞处理参照 [Linux man-pages 5.13 的 mmap(2) 与 munmap(2)](https://raw.githubusercontent.com/mkerrisk/man-pages/man-pages-5.13/man2/mmap.2)。
+- 堆顶按字节记录、映射按页增减。Linux 原始 `brk` 在堆增长因空间不足被拒时返回旧堆顶，FocOS 内存层保留具体错误供 [#23](https://github.com/MindScrath/Focos/issues/23) 对接。参见 [Linux v6.12 的 brk 系统调用](https://github.com/torvalds/linux/blob/v6.12/mm/mmap.c#L103-L204)。
+
 ## 多平台设计参考
 
 [KernelX 固定快照](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/tree/12ac84b6401cbddf75ca937ad485f8437cb3dc1d)（2026-11-11 源码检查）：
