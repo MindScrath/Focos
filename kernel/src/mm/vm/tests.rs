@@ -7,6 +7,8 @@ use crate::arch::riscv64::paging::{Sv39, VmCpu};
 use crate::mm::PageAllocator;
 use core::cell::{Cell, RefCell};
 use std::{boxed::Box, rc::Rc, vec::Vec};
+#[cfg(target_pointer_width = "64")]
+mod user;
 
 #[derive(Default)]
 pub(crate) struct Stats {
@@ -102,7 +104,9 @@ pub(crate) struct HostMemory<'a> {
 }
 impl<'a> HostMemory<'a> {
     pub fn new(flags: &'a mut [bool]) -> Self {
-        let start = 0x803000;
+        Self::at(flags, 0x803000)
+    }
+    pub(crate) fn at(flags: &'a mut [bool], start: usize) -> Self {
         let end = start + flags.len() * PAGE_SIZE;
         Self {
             allocator: PageAllocator::new(start, end, flags).unwrap(),
@@ -114,9 +118,9 @@ impl<'a> HostMemory<'a> {
     #[cfg(target_pointer_width = "64")]
     pub fn layout(&self) -> KernelLayout {
         KernelLayout {
-            code: PhysAddr(0x800000)..PhysAddr(0x801000),
-            rodata: PhysAddr(0x801000)..PhysAddr(0x802000),
-            writable: PhysAddr(0x802000)..PhysAddr(self.start),
+            code: PhysAddr(self.start - 3 * PAGE_SIZE)..PhysAddr(self.start - 2 * PAGE_SIZE),
+            rodata: PhysAddr(self.start - 2 * PAGE_SIZE)..PhysAddr(self.start - PAGE_SIZE),
+            writable: PhysAddr(self.start - PAGE_SIZE)..PhysAddr(self.start),
             allocatable: self.managed_range(),
             test_window: VirtAddr(0xffffffc000000000)..VirtAddr(0xffffffc000004000),
         }

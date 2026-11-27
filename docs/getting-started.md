@@ -74,7 +74,10 @@ make check
 make mm-smoke
 make irq-smoke
 make vm-smoke
+make user-vm-smoke
 ```
+
+`make user-vm-smoke` 运行 [MM-004](../specs/MM-004.md) 的单核内核态验收，通过时显示 `PASS: MM-004`。异常原因、故障地址、已拷贝字节数、根切换和最终页数保存在 `target/evidence/user-vm-qemu-rv.log`。
 
 完整 QEMU 命令以 [scripts/smoke.py](../scripts/smoke.py) 为准，日志也记录实际命令。布局、页读写、中断状态及成功标记通过只证明当前启动自检，不代表用户程序或文件系统已运行。
 

@@ -3,6 +3,7 @@
 //! 页分配器只管理页地址与占用状态，不访问物理内存；`boot_check` 提供启动时的页读写检查。
 
 pub mod boot_check;
+pub mod user_vm_check;
 pub(crate) mod vm;
 pub mod vm_check;
 pub use vm::*;

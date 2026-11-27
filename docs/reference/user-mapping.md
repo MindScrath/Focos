@@ -226,7 +226,7 @@ pub unsafe trait UserAccess {
    - **每字节仅在单条用户访存指令前后开关 `SUM`**：
      - `copy_from_user`：循环内先 `csrs sstatus, t_sum` → 单条带标签指令 `focos_copy_from_user_load_pc: lbu t0, 0(a0)` → 紧接 `csrc sstatus, t_sum` 立即清零 `SUM`，之后再在 `SUM=0` 下向内核缓冲区执行 `sb t0, 0(a1)` 及指针递增/分支；
      - `copy_to_user`：循环内先在 `SUM=0` 下从内核缓冲区执行 `lbu t0, 0(a1)`，再 `csrs sstatus, t_sum` → 单条带标签指令 `focos_copy_to_user_store_pc: sb t0, 0(a0)` → 紧接 `csrc sstatus, t_sum` 立即清零 `SUM`，之后再在 `SUM=0` 下执行指针递增/分支。
-   - **故障恢复点强制清零**：因异常入口 `focos_vm_trap_entry`（`fault.S`）在 `sret` 前通过 `csrw sstatus` 从栈帧恢复故障指令触发时保存的 `sstatus`（其中 `SUM=1`；`sret` 本身只按特权规范恢复 `SIE`/`SPIE`/`SPP` 而不改动 `SUM`），故障恢复标签 `focos_copy_from_user_fault_resume` / `focos_copy_to_user_fault_resume` 首条操作必须立即重装掩码 `0x40000` 并执行 `csrc sstatus, t1` 清零 `SUM` 后再返回。
+   - **异常返回与故障恢复**：栈帧保留故障时的 `sstatus`。异常返回时先从保存值中清除 `SUM` 位，再写回 `sstatus`，随后恢复通用寄存器并执行 `sret`。两个恢复标签 `focos_copy_from_user_fault_resume` 和 `focos_copy_to_user_fault_resume` 都以重装掩码、清零 `SUM` 开始。
    - 返回 Rust 后立即消费并清空 `RECORD`，并**读回 `sstatus` 断言 `SUM == 0 && MXR == 0`**；若读回不为 0 则立即 panic 关机，绝不带着 `SUM=1` 返回调用者。
 5. **部分拷贝与错误输出语义**：
    - **前置错误**（`Destroyed`、`InvalidState`、`InvalidAddress`、`OutsideUserRange`、`Busy`）：零访存，`dst` 和用户页均原样不变，`SUM` 从未置位。
@@ -249,7 +249,7 @@ pub unsafe trait UserAccess {
 | 多空间与状态机 | 两个并存 `UserAddressSpace` 映射同一 VA 到不同 PA 互不干扰；`KernelBase → A → B → KernelBase` 及重复激活、跨不同 `KernelBase` 切换、活动销毁、`switch_root` 读回不匹配恢复失败均按契约处理 |
 | 拷贝状态机与故障注入 | 事件注入覆盖 `probe_user_isolation` 与 `copy_from_user`/`copy_to_user` 的零长度（合法与核外/空指针）、越界/溢出、`Busy`、`SUM!=0` 初态拒绝、首字节故障、跨页偏移故障（验证 `copied` 与 `dst[copied..]` 清零）、`stval` 越出拷贝区间或重复异常触发意外失败 |
 | API 与编译边界 | `scripts/test_vm_api.py` 扩展调用方编译测试：存在 `UserAddressSpace` 时调用 `kernel_base.destroy()`/`deactivate()` 编译失败（`E0502`）；漏标 `unsafe` 调用 `UserAddressSpace`/`UserAccess` 入口报 `E0133`；`x86_64` 与 `i686` 均通过 `cargo clippy -- -D warnings` |
-| 汇编与静态审阅 | 核对 `fault.S` 入口清零 `SUM`、拷贝循环内**每字节紧邻单条标签 `lbu`/`sb` 前后置位并立即清零 `SUM`**（内核缓冲区访存与循环控制在 `SUM=0` 下执行）、故障恢复点立即清零 `SUM`、返回 Rust 后读回断言及寄存器/栈对齐；核对 `kernel/src/mm/` 不含架构条件编译 |
+| 汇编与静态审阅 | 核对 `fault.S` 入口清零 `SUM`、拷贝循环内**每字节紧邻单条标签 `lbu`/`sb` 前后置位并立即清零 `SUM`**（内核缓冲区访存与循环控制在 `SUM=0` 下执行）、异常出栈时仅清除保存值的 `SUM` 位再写回 `sstatus`、故障恢复点立即清零 `SUM`、返回 Rust 后读回断言及寄存器/栈对齐；核对 `kernel/src/mm/` 不含架构条件编译 |
 
 ### QEMU 实际行为
 

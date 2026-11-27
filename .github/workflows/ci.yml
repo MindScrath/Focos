@@ -40,6 +40,8 @@ jobs:
         run: make irq-smoke
       - name: Verify MM-003 kernel paging
         run: make vm-smoke
+      - name: Verify MM-004 user mappings
+        run: make user-vm-smoke
       - name: Keep boot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -43,7 +43,7 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
         .unwrap_or_else(|error| panic!("VM CPU initialization failed: {error:?}"));
     // SAFETY: 布局来自实际链接符号；单核关中断，计数对应此唯一服务。
     // 回调在基础页表建好后安装异常入口；最终空间及探针均持有至关机。
-    let (_address_space, _fault_probe) = unsafe {
+    let (address_space, mut fault_probe) = unsafe {
         focos_kernel::mm::vm_check::check_paging(
             &mut memory,
             &mut arch,
@@ -60,6 +60,26 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
         live.get()
     ));
     hal::console_write("FOCOS_VM_OK\n");
+    let kernel = address_space
+        .into_kernel_base(focos_kernel::platform::user_address_range())
+        .unwrap_or_else(|(error, _)| panic!("active kernel handoff: {error:?}"));
+    // SAFETY: 继续使用同一启动核、计数器、分配服务和同步入口；基础根持续活动。
+    unsafe {
+        focos_kernel::mm::user_vm_check::check_user_paging(
+            &kernel,
+            &mut memory,
+            &mut arch,
+            &mut fault_probe,
+            &live,
+            hal::probe_return_code(),
+            hal::console_write,
+        )
+    };
+    hal::console_write_fmt(format_args!(
+        "FocOS USER VM retained table pages: {}\n",
+        live.get()
+    ));
+    hal::console_write("FOCOS_USER_VM_CLEAN_OK\nFOCOS_USER_VM_OK\n");
     hal::console_write("FocOS: early S-mode boot\nFOCOS_BOOT_OK\n");
     hal::shutdown(false)
 }

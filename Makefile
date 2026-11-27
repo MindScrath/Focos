@@ -1,4 +1,4 @@
-.PHONY: all build fmt lint test smoke mm-smoke irq-smoke vm-smoke check clean
+.PHONY: all build fmt lint test smoke mm-smoke irq-smoke vm-smoke user-vm-smoke check clean
 
 TARGET := riscv64gc-unknown-none-elf
 HOST_TARGET := $(shell rustc -vV | sed -n 's/^host: //p')
@@ -20,16 +20,19 @@ test:
 	python3 -B -m unittest discover -s scripts -p 'test_*.py'
 
 smoke: build
-	python3 scripts/smoke.py
+	python3 -B scripts/smoke.py
 
 mm-smoke: build
-	python3 scripts/smoke.py --mm
+	python3 -B scripts/smoke.py --mm
 
 irq-smoke: build
-	python3 scripts/smoke.py --irq
+	python3 -B scripts/smoke.py --irq
 
 vm-smoke: build
-	python3 scripts/smoke.py --vm
+	python3 -B scripts/smoke.py --vm
+
+user-vm-smoke: build
+	python3 -B scripts/smoke.py --user-vm
 
 check: fmt lint test smoke
 

@@ -13,6 +13,11 @@ const KERNEL_START: usize = 0x8020_0000;
 /// 为整段 RAM 预留标记容量，实际管理范围由内核末尾和设备树限定。
 const MAX_PAGE_COUNT: usize = (RAM_END - RAM_START) / PAGE_SIZE;
 
+/// 低 64 KiB 留作空指针保护区；用户映射止于第一个 Sv39 顶层槽位末端。
+pub fn user_address_range() -> Range<crate::mm::VirtAddr> {
+    crate::mm::VirtAddr::from_raw(0x1_0000)..crate::mm::VirtAddr::from_raw(0x4000_0000)
+}
+
 /// 启动内存布局或分配器初始化失败的原因。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemoryInitError {

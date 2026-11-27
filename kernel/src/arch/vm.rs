@@ -1,6 +1,7 @@
 //! 页表与同步异常的架构能力；只借用公共内存层登记的页。
 
 use crate::mm::{PageMapping, PhysAddr, Translation, VirtAddr, VmError, VmPage};
+use core::ops::Range;
 
 /// 只允许访问当前地址空间登记的表页，不提供分配和释放能力。
 pub trait TableAccess {
@@ -29,6 +30,20 @@ pub unsafe trait VmArch {
     fn valid_phys(&self, pa: PhysAddr) -> bool;
     /// 判断虚拟地址能否表示，不检查页对齐或自检窗口。
     fn valid_virt(&self, va: VirtAddr) -> bool;
+    /// 用户区间必须整页位于用户地址范围内，与每段保留区间不共用顶层槽位。
+    fn valid_user_range(&self, user_range: Range<VirtAddr>, reserved: &[Range<VirtAddr>]) -> bool;
+    /// 将内核恒等区覆盖的顶层项复制到空目的根，不复制其他槽位或改动下级表。
+    ///
+    /// # Safety
+    /// 两根及下级表均已登记、由调用方持有。目的根未发布且独占；源分支保持只读，
+    /// 所有借用它们的根退役前不得释放。操作串行，与硬件读取共享源表兼容。
+    unsafe fn copy_kernel_root<T: TableAccess>(
+        &mut self,
+        tables: &mut T,
+        dst_root: PhysAddr,
+        src_root: PhysAddr,
+        kernel_range: Range<VirtAddr>,
+    ) -> Result<(), VmError>;
     /// 只读检查空缺路径，返回所需表页数 0–2；已有映射返回 AlreadyMapped。
     /// 非法地址返回 InvalidAddress，未知表页或非法表项返回 InvalidTable。
     fn needed_tables<T: TableAccess>(
@@ -42,7 +57,7 @@ pub unsafe trait VmArch {
     /// 非法地址、不对齐、权限不支持或重复映射分别返回对应 VmError。
     ///
     /// # Safety
-    /// 登记表稳定，表页存储独占有效，修改串行且无冲突引用；旧树不共享中间页表。
+    /// 修改路径和 spare 独占，表页存储有效，修改串行且无冲突引用；其他槽位可共享只读内核分支。
     /// 活动映射的数据页须按请求权限有效，不能破坏当前执行路径；未活动树在启用前保证。
     /// 调用方持有全部页面，活动修改返回后同步，再允许访问新别名或归还旧页。
     unsafe fn map_page<T: TableAccess>(
@@ -64,7 +79,7 @@ pub unsafe trait VmArch {
     /// 非法地址、不对齐、缺失映射及非法表项分别返回对应错误。
     ///
     /// # Safety
-    /// 登记表稳定、表页存储独占有效，旧树不共享中间页表；没有并发修改或冲突引用。
+    /// 修改和回收的路径独占；其他槽位可共享只读内核分支。没有并发修改或冲突引用。
     /// 已结束目标别名访问，不能撤销当前执行所需映射；返回后同步才能释放 retired。
     unsafe fn unmap_page<T: TableAccess>(
         &mut self,
@@ -86,6 +101,16 @@ pub unsafe trait VmArch {
     /// 代码、栈、返回路径、只读数据、异常入口及其记录、日志路径所需内存，
     /// 均须在切换前后按所需权限可访问，包括切换后的状态输出和失败处理。
     unsafe fn activate(&mut self, root: PhysAddr) -> Result<(), VmError>;
+    /// 从预期的当前根切至目标根，切换前后同步并读回新根；写入失败时确认恢复原根。
+    ///
+    /// # Safety
+    /// 唯一启动核、关中断；两个根及可达表页均有效并持续持有。代码、栈、异常、
+    /// 只读数据、返回与日志路径在两棵树中的权限和地址均有效，没有跨切换用户引用。
+    unsafe fn switch_root(
+        &mut self,
+        expected_current: PhysAddr,
+        next: PhysAddr,
+    ) -> Result<(), VmError>;
     /// 当前根属于调用方时恢复无分页并同步；前置状态不符返回 InvalidState。
     /// 切换后无法确认无分页时终止运行，不允许后续回收。
     ///
@@ -163,6 +188,59 @@ pub enum ProbeError {
     InvalidProbe,
     /// 操作正常返回，没有捕获异常；保护用例必须判失败。
     NotObserved,
+}
+
+/// 受控用户拷贝的前置错误或已确认的部分完成结果。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserCopyError {
+    /// 空间已经显式销毁。
+    Destroyed,
+    /// 当前根、异常入口或 CPU 访问状态不满足约定。
+    InvalidState,
+    /// 字节区间溢出或跨越非法地址。
+    InvalidAddress,
+    /// 地址可表示，但不在当前用户区间。
+    OutsideUserRange,
+    /// 还有尚未消费的探针或拷贝记录。
+    Busy,
+    /// 精确匹配到用户访存异常；前 copied 个字节已经完成。
+    Fault {
+        /// 由唯一用户访存指令触发的实际异常。
+        fault: FaultInfo,
+        /// 首个故障字节之前已完成的长度。
+        copied: usize,
+    },
+}
+
+/// 单核受控用户访存，与普通探针共用异常入口和单次匹配记录。
+///
+/// # Safety
+/// 只对单条用户指令开放访问。故障须匹配原因、PC 和目标区间，所有出口恢复内核访问状态。
+pub unsafe trait UserAccess {
+    /// 验证常态下的用户页隔离，精确匹配单次异常。
+    ///
+    /// # Safety
+    /// 同 FaultProbe::probe：关中断、目标为授权的测试页，意外成功也能安全返回。
+    unsafe fn probe_user_isolation(
+        &mut self,
+        op: ProbeOp,
+        expected: ExpectedFault,
+    ) -> Result<FaultInfo, ProbeError>;
+    /// 部分读取失败时清零内核缓冲区的未读部分；前置错误不修改缓冲区。
+    ///
+    /// # Safety
+    /// 单核关中断，整个源区间已由活动空间校验，内核目的有效、无物理别名或冲突借用。
+    unsafe fn copy_from_user(
+        &mut self,
+        user_addr: VirtAddr,
+        dst: &mut [u8],
+    ) -> Result<(), UserCopyError>;
+    /// 部分写入失败时只修改已经完成的前缀。
+    ///
+    /// # Safety
+    /// 单核关中断，整个目的区间已由活动空间校验，内核源有效且与用户页不别名。
+    unsafe fn copy_to_user(&mut self, user_addr: VirtAddr, src: &[u8])
+    -> Result<(), UserCopyError>;
 }
 
 /// 单次预期异常探针，不借用内存服务或地址空间。

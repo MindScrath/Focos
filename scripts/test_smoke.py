@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import smoke
+import user_vm_smoke
 
 
 VM_SYMBOLS = {
@@ -38,6 +39,29 @@ FOCOS_VM_OK
 FOCOS_BOOT_OK
 """
 
+USER_SYMBOLS = dict(VM_SYMBOLS, focos_copy_from_user_load_pc=0x80203400,
+                    focos_copy_to_user_store_pc=0x80203450,
+                    focos_copy_from_user_fault_resume=0x80203420,
+                    focos_copy_to_user_fault_resume=0x80203470)
+USER_SUCCESS = SUCCESS.replace("FOCOS_BOOT_OK", """FocOS USER VM CPU: satp=0x8000000000080268 mode=Sv39 asid=0 root=0x80268000
+FOCOS_USER_ISOLATION_FAULT scause=0xd sepc=0x80202000 stval=0x10000
+FOCOS_USER_ISOLATION_FAULT scause=0xf sepc=0x80201000 stval=0x10000
+FOCOS_USER_ISOLATION_FAULT scause=0xc sepc=0x12000 stval=0x12000
+FOCOS_USER_VM_ISOLATION_OK
+FOCOS_USER_COPY_FAULT scause=0xd sepc=0x80203400 stval=0x13000 copied=0
+FOCOS_USER_COPY_FAULT scause=0xf sepc=0x80203450 stval=0x11000 copied=0
+FOCOS_USER_COPY_FAULT scause=0xd sepc=0x80203400 stval=0x15000 copied=8
+FOCOS_USER_COPY_FAULT scause=0xf sepc=0x80203450 stval=0x15000 copied=8
+FOCOS_USER_VM_COPY_OK
+FocOS USER VM CPU: satp=0x8000000000080269 mode=Sv39 asid=0 root=0x80269000
+FocOS USER VM CPU: satp=0x8000000000080268 mode=Sv39 asid=0 root=0x80268000
+FOCOS_USER_VM_SWITCH_OK
+FocOS USER VM CPU: satp=0x8000000000080224 mode=Sv39 asid=0 root=0x80224000
+FocOS USER VM retained table pages: 64
+FOCOS_USER_VM_CLEAN_OK
+FOCOS_USER_VM_OK
+FOCOS_BOOT_OK""")
+
 
 class ResultTests(unittest.TestCase):
     """验证各合同的成功标记、顺序和退出状态；固件版本不作为通过条件。"""
@@ -52,7 +76,7 @@ class ResultTests(unittest.TestCase):
         """启动、内存、中断和分页合同都能从完整输出中取到自己的标记。"""
         for contract in smoke.CONTRACTS:
             with self.subTest(contract=contract):
-                smoke.validate_result(SUCCESS, 0, contract)
+                smoke.validate_result(USER_SUCCESS, 0, contract, USER_SYMBOLS)
 
     def test_boot_only_is_not_memory_or_irq_success(self):
         """旧内核仍能通过启动检查，但不能通过新增专项检查。"""
@@ -72,7 +96,7 @@ class ResultTests(unittest.TestCase):
                                       replacement=replacement):
                         with self.assertRaises(ValueError):
                             smoke.validate_result(
-                                SUCCESS.replace(marker, replacement), 0, contract,
+                                USER_SUCCESS.replace(marker, replacement), 0, contract, USER_SYMBOLS,
                             )
 
     def test_rejects_reversed_success_order(self):
@@ -182,6 +206,90 @@ class ResultTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "status"):
             smoke.validate_result(SUCCESS, 1, "vm")
 
+    def test_user_vm_rejects_old_elf_output_even_after_vm_ok(self):
+        smoke.validate_result(SUCCESS, 0, "vm", VM_SYMBOLS)
+        with self.assertRaisesRegex(ValueError, "FOCOS_USER_VM"):
+            smoke.validate_result(SUCCESS, 0, "user-vm", USER_SYMBOLS)
+
+    def test_user_vm_checks_each_fault_and_its_stage(self):
+        lines = USER_SUCCESS.splitlines()
+        for i, line in enumerate(lines):
+            if not line.startswith(("FOCOS_USER_COPY_FAULT", "FOCOS_USER_ISOLATION_FAULT")):
+                continue
+            bad = [line.replace("scause=0x", "scause=0x1"), line.replace("sepc=0x", "sepc=0x1"),
+                   line.replace("stval=0x", "stval=0x1"), "", line + "\n" + line]
+            if "copied=" in line:
+                bad.append(line.replace("copied=", "copied=1"))
+            for replacement in bad:
+                with self.subTest(line=line, replacement=replacement), self.assertRaises(ValueError):
+                    smoke.validate_result("\n".join([*lines[:i], replacement, *lines[i+1:]]),
+                                          0, "user-vm", USER_SYMBOLS)
+            with self.assertRaises(ValueError):
+                smoke.validate_result(USER_SUCCESS.replace(line + "\n", "") + line + "\n",
+                                      0, "user-vm", USER_SYMBOLS)
+
+    def test_user_vm_checks_all_transitions_and_reclamation(self):
+        cpus = [line for line in USER_SUCCESS.splitlines() if line.startswith("FocOS USER VM CPU")]
+        for changed in [USER_SUCCESS.replace(cpus[0], cpus[1]),
+                        USER_SUCCESS.replace(cpus[3], cpus[1]),
+                        USER_SUCCESS.replace(cpus[1], cpus[0]), USER_SUCCESS.replace(cpus[1], ""),
+                        USER_SUCCESS.replace(cpus[1], cpus[1].replace("asid=0", "asid=1")),
+                        USER_SUCCESS.replace(cpus[1], cpus[1].replace("80269000", "8026a000")),
+                        USER_SUCCESS.replace(cpus[1]+"\n", "") + cpus[1] + "\n",
+                        USER_SUCCESS.replace("USER VM retained table pages: 64", "USER VM retained table pages: 63"),
+                        USER_SUCCESS + "FOCOS_VM_UNEXPECTED", USER_SUCCESS + "FOCOS_PANIC"]:
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                smoke.validate_result(changed, 0, "user-vm", USER_SYMBOLS)
+        with self.assertRaises(ValueError):
+            smoke.validate_result(USER_SUCCESS, 1, "user-vm", USER_SYMBOLS)
+
+
+class TrapReturnTests(unittest.TestCase):
+    """检查异常出栈期间的 SUM，覆盖恢复标签清零之前的权限窗口。"""
+
+    saved = bytes.fromhex("83 32 01 10")  # ld t0,256(sp)
+    clear_sum = bytes.fromhex("37 03 04 00 13 43 f3 ff b3 f2 62 00")  # t0 &= ~(1 << 18)
+    write_status = bytes.fromhex("73 90 02 10")  # csrw sstatus,t0
+    pop_ra = bytes.fromhex("a2 60")  # c.ldsp ra,8(sp)
+    sret = bytes.fromhex("73 00 20 10")
+
+    def test_trap_state_reads_may_precede_sstatus_write(self):
+        read_sstatus = bytes.fromhex("92 62")  # c.ldsp t0,256(sp)
+        read_float = bytes.fromhex("07 30 01 11")  # fld ft0,272(sp)
+        read_fcsr = bytes.fromhex("83 32 81 10")  # ld t0,264(sp)
+        user_vm_smoke.audit_trap_return(
+            read_sstatus + read_float + read_fcsr
+            + self.saved + self.clear_sum + self.write_status + self.pop_ra + self.sret)
+
+    def test_general_register_restores_must_follow_sstatus_write(self):
+        restore_status = self.saved + self.clear_sum + self.write_status
+        loads = (
+            ("c.ldsp ra,8(sp)", self.pop_ra),
+            ("ld ra,8(sp)", bytes.fromhex("83 30 81 00")),
+            ("c.ldsp t6,248(sp)", bytes.fromhex("ee 7f")),
+            ("ld t6,248(sp)", bytes.fromhex("83 3f 81 0f")),
+        )
+        for instruction, load in loads:
+            with self.subTest(instruction=instruction):
+                user_vm_smoke.audit_trap_return(restore_status + load + self.sret)
+                with self.assertRaisesRegex(ValueError, "register restored before sstatus"):
+                    user_vm_smoke.audit_trap_return(load + restore_status + self.sret)
+
+    def test_fault_time_sum_cannot_be_replayed(self):
+        clear_mxr = bytes.fromhex("37 03 08 00") + self.clear_sum[4:]
+        for mask in (b"", clear_mxr):
+            with self.subTest(mask=mask), self.assertRaisesRegex(ValueError, "re-enable SUM"):
+                user_vm_smoke.audit_trap_return(
+                    self.saved + mask + self.write_status + self.pop_ra + self.sret)
+
+    def test_sum_must_stay_clear_until_sret(self):
+        restore = self.saved + self.clear_sum + self.write_status
+        enable_then_clear = bytes.fromhex("73 20 03 10 73 30 03 10")  # csrs/csrc sstatus,t1
+        for tail in (self.write_status + self.sret, enable_then_clear + self.sret,
+                     self.sret + self.write_status + self.sret, b""):
+            with self.subTest(tail=tail), self.assertRaises(ValueError):
+                user_vm_smoke.audit_trap_return(restore + self.pop_ra + tail)
+
 
 class SymbolTests(unittest.TestCase):
     """核对 readelf 输出解析和错误传播，不把缺少符号当成跳过验收。"""
@@ -253,15 +361,18 @@ class RunnerTests(unittest.TestCase):
             )
 
     def test_vm_timeout_after_success_fails(self):
-        """分页成功标记之后的超时仍记录失败。"""
-        error = subprocess.TimeoutExpired("qemu", 20, output=SUCCESS.encode())
-        with patch.object(smoke.subprocess, "check_output", return_value="QEMU 8.2.2\n"), \
-                patch.object(smoke.subprocess, "run", side_effect=error), \
-                patch.object(smoke, "write_log") as write_log:
-            with self.assertRaisesRegex(SystemExit, "timed out"):
-                smoke.run_check("vm")
-            self.assertEqual(write_log.call_args.args[0], smoke.VM_LOG)
-            self.assertEqual(write_log.call_args.args[-1], "TIMEOUT")
+        """两个分页专项收到完整标记后若超时，仍各自保存失败日志。"""
+        for contract, log, output in [("vm", smoke.VM_LOG, SUCCESS),
+                                      ("user-vm", smoke.USER_VM_LOG, USER_SUCCESS)]:
+            error = subprocess.TimeoutExpired("qemu", 20, output=output.encode())
+            with self.subTest(contract=contract), \
+                    patch.object(smoke.subprocess, "check_output", return_value="QEMU 8.2.2\n"), \
+                    patch.object(smoke.subprocess, "run", side_effect=error), \
+                    patch.object(smoke, "write_log") as write_log:
+                with self.assertRaisesRegex(SystemExit, "timed out"):
+                    smoke.run_check(contract)
+                self.assertEqual(write_log.call_args.args[0], log)
+                self.assertEqual(write_log.call_args.args[-1], "TIMEOUT")
 
     def test_irq_contract_uses_its_own_log(self):
         """中断专项通过时报告 ARCH-001，并写入独立日志路径。"""

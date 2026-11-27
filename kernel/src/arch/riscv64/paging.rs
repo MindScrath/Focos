@@ -3,6 +3,7 @@ use crate::hal::{RemovedMapping, TableAccess, VmArch};
 use crate::mm::{
     MapPerm, PAGE_SIZE, PageMapping, PhysAddr, Translation, VirtAddr, VmError, VmPage,
 };
+use core::ops::{Range, RangeInclusive};
 use core::sync::atomic::{Ordering, compiler_fence};
 
 // 本后端的 12 位页内偏移与 512 个 8 字节表项要求公共页大小固定为 4 KiB。
@@ -81,6 +82,9 @@ fn decode(raw: u64, depth: usize) -> Result<Entry, VmError> {
         0xc3 => MapPerm::R,
         0xc7 => MapPerm::RW,
         0xcb => MapPerm::RX,
+        0xd3 => MapPerm::USER_R,
+        0xd7 => MapPerm::USER_RW,
+        0xdb => MapPerm::USER_RX,
         _ => return Err(VmError::InvalidTable),
     };
     Ok(Entry::Leaf(PageMapping { phys: pa, perm }))
@@ -88,6 +92,21 @@ fn decode(raw: u64, depth: usize) -> Result<Entry, VmError> {
 /// 只编码已校验的页首地址与本阶段支持的低位标记。
 fn pte(pa: PhysAddr, flags: u64) -> u64 {
     ((pa.as_usize() as u64 >> 12) << 10) | flags
+}
+
+/// 半开区间须在同一规范地址半区。以最后一个字节取槽位，允许 end 恰在槽位边界。
+fn top_slots(range: &Range<VirtAddr>) -> Option<RangeInclusive<usize>> {
+    let start = range.start.as_usize() as u64;
+    let end = range.end.as_usize() as u64;
+    let low_end = 1u64 << 38;
+    if start >= end
+        || !start.is_multiple_of(PAGE_SIZE as u64)
+        || !end.is_multiple_of(PAGE_SIZE as u64)
+        || !(end <= low_end || start >= 0u64.wrapping_sub(low_end))
+    {
+        return None;
+    }
+    Some(((start >> 30) & 511) as usize..=(((end - 1) >> 30) & 511) as usize)
 }
 
 impl<C: VmCpu> Sv39<C> {
@@ -169,6 +188,57 @@ unsafe impl<C: VmCpu> VmArch for Sv39<C> {
         let value = va.as_usize();
         !((1usize << 38)..(0usize.wrapping_sub(1usize << 38))).contains(&value)
     }
+    fn valid_user_range(&self, user: Range<VirtAddr>, reserved: &[Range<VirtAddr>]) -> bool {
+        if user.start.as_usize() < PAGE_SIZE || user.end.as_usize() as u64 > 1u64 << 38 {
+            return false;
+        }
+        let Some(slots) = top_slots(&user) else {
+            return false;
+        };
+        reserved.iter().all(|range| {
+            top_slots(range)
+                .is_some_and(|other| other.end() < slots.start() || slots.end() < other.start())
+        })
+    }
+    unsafe fn copy_kernel_root<T: TableAccess>(
+        &mut self,
+        tables: &mut T,
+        dst: PhysAddr,
+        src: PhysAddr,
+        range: Range<VirtAddr>,
+    ) -> Result<(), VmError> {
+        let slots = top_slots(&range).ok_or(VmError::InvalidLayout)?;
+        if dst == src
+            || [dst, src]
+                .iter()
+                .any(|&p| !self.valid_phys(p) || !p.as_usize().is_multiple_of(PAGE_SIZE))
+        {
+            return Err(VmError::InvalidTable);
+        }
+        let target = tables.table_mut(dst)?;
+        if (0..512).any(|i| read(target, i) != 0) {
+            return Err(VmError::InvalidTable);
+        }
+        let source = tables.table(src)?;
+        for i in slots.clone() {
+            match decode(read(source, i), 0)? {
+                Entry::Table(pa) if pa != src && pa != dst => {
+                    tables.table(pa)?;
+                }
+                _ => return Err(VmError::InvalidTable),
+            }
+        }
+        // 源槽位全部通过校验后才发布；共享的下级表自始至终只读。
+        for i in slots {
+            let value = read(tables.table(src).expect("validated source root"), i);
+            write(
+                tables.table_mut(dst).expect("validated user root"),
+                i,
+                value,
+            );
+        }
+        Ok(())
+    }
     fn needed_tables<T: TableAccess>(
         &self,
         tables: &T,
@@ -197,7 +267,7 @@ unsafe impl<C: VmCpu> VmArch for Sv39<C> {
         {
             return Err(VmError::UnalignedAddress);
         }
-        if !mapping.perm.supported() {
+        if !mapping.perm.supported_leaf() {
             return Err(VmError::UnsupportedPermissions);
         }
         let mut path = self.walk(tables, root, va)?;
@@ -226,7 +296,8 @@ unsafe impl<C: VmCpu> VmArch for Sv39<C> {
         }
         let flags = 0xc3
             | if mapping.perm.write { 4 } else { 0 }
-            | if mapping.perm.execute { 8 } else { 0 };
+            | if mapping.perm.execute { 8 } else { 0 }
+            | if mapping.perm.user { 0x10 } else { 0 };
         // 所有可返回错误的步骤均已结束；先初始化叶项，再由深到浅发布父项。
         write(
             tables.table_mut(path.tables[2]).expect("validated leaf"),
@@ -352,6 +423,51 @@ unsafe impl<C: VmCpu> VmArch for Sv39<C> {
             "FocOS VM CPU: satp={:#x} mode=Sv39 asid=0 root={:#x}\n",
             self.cpu.read_satp(),
             root.as_usize()
+        ));
+        Ok(())
+    }
+    unsafe fn switch_root(&mut self, current: PhysAddr, next: PhysAddr) -> Result<(), VmError> {
+        for root in [current, next] {
+            if !self.valid_phys(root) {
+                return Err(VmError::InvalidAddress);
+            }
+        }
+        if [current, next]
+            .iter()
+            .any(|p| !p.as_usize().is_multiple_of(PAGE_SIZE))
+        {
+            return Err(VmError::UnalignedAddress);
+        }
+        if self.current_root()? != Some(current) {
+            return Err(VmError::InvalidState);
+        }
+        let satp = |p: PhysAddr| (8usize << 60) | (p.as_usize() >> 12);
+        // SAFETY: 当前根已核实，调用者持有两棵树，执行、异常及返回路径共享。
+        unsafe {
+            self.cpu.prepare()?;
+            self.cpu.fence();
+            self.cpu.write_satp(satp(next));
+            self.cpu.fence();
+        }
+        let actual = self.cpu.read_satp();
+        if actual != satp(next) {
+            // SAFETY: 两根都仍有效；恢复原根并确认后才允许返回给资源持有者。
+            unsafe {
+                self.cpu.fence();
+                self.cpu.write_satp(satp(current));
+                self.cpu.fence();
+            }
+            assert_eq!(
+                self.cpu.read_satp(),
+                satp(current),
+                "cannot restore previous root"
+            );
+            return Err(VmError::ActivationFailed);
+        }
+        #[cfg(target_arch = "riscv64")]
+        crate::hal::console_write_fmt(format_args!(
+            "FocOS USER VM CPU: satp={actual:#x} mode=Sv39 asid=0 root={:#x}\n",
+            next.as_usize()
         ));
         Ok(())
     }

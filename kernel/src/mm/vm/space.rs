@@ -8,10 +8,57 @@ use core::mem::ManuallyDrop;
 const TABLE_CAPACITY: usize = 128;
 
 /// 只登记此地址空间拥有的表页；数据页句柄不会进入集合。
-pub(crate) struct Tables<P: VmPage> {
-    pages: [Option<P>; TABLE_CAPACITY],
+pub(crate) struct Tables<P: VmPage, const N: usize = TABLE_CAPACITY> {
+    pages: [Option<P>; N],
 }
-impl<P: VmPage> TableAccess for Tables<P> {
+
+/// 内核表和用户视图共用申请、发布、回滚顺序；新表始终登记在接收方的私有集合中。
+pub(super) trait MappingTables<const N: usize>: TableAccess + Sized {
+    fn owned(&mut self) -> &mut Tables<Self::Page, N>;
+
+    /// # Safety
+    /// 目标路径和新页由调用方独占。目标物理页须满足映射权限；活动时单核关中断，
+    /// 修改不破坏执行、异常或返回路径。后端失败时保留旧树，新增页尚未发布。
+    unsafe fn insert_page(
+        &mut self,
+        memory: &mut impl VmMemory<Page = Self::Page>,
+        arch: &mut impl VmArch,
+        root: PhysAddr,
+        va: VirtAddr,
+        mapping: PageMapping,
+        active: bool,
+    ) -> Result<(), VmError> {
+        let count = arch.needed_tables(self, root, va)?;
+        let mut spare = [PhysAddr(0); 2];
+        let slots = spare.get_mut(..count).ok_or(VmError::InvalidTable)?;
+        let mut acquired = 0;
+        let result = (|| {
+            for slot in &mut *slots {
+                *slot = self.owned().alloc(memory)?;
+                acquired += 1;
+            }
+            // SAFETY: 目标路径独占，所需的新表均已清零、互异并登记；共享分支只读。
+            unsafe { arch.map_page(self, root, va, mapping, slots) }
+        })();
+        if active {
+            // SAFETY: 修改已结束，全部页仍持有；本核关中断，回收前必须完成同步。
+            unsafe { arch.sync_translations() };
+        }
+        if result.is_err() {
+            for &pa in &spare[..acquired] {
+                self.owned().release(memory, pa);
+            }
+        }
+        result
+    }
+}
+
+impl<P: VmPage, const N: usize> MappingTables<N> for Tables<P, N> {
+    fn owned(&mut self) -> &mut Self {
+        self
+    }
+}
+impl<P: VmPage, const N: usize> TableAccess for Tables<P, N> {
     type Page = P;
     fn table(&self, pa: PhysAddr) -> Result<&P, VmError> {
         self.pages
@@ -28,9 +75,66 @@ impl<P: VmPage> TableAccess for Tables<P> {
             .ok_or(VmError::InvalidTable)
     }
 }
+
+impl<P: VmPage, const N: usize> Tables<P, N> {
+    /// 空登记表本身不申请物理页。
+    pub(super) fn empty() -> Self {
+        Self {
+            pages: core::array::from_fn(|_| None),
+        }
+    }
+    /// 先取得句柄槽位，再从同一资源服务申请一张清零的页。
+    pub(super) fn alloc(
+        &mut self,
+        memory: &mut impl VmMemory<Page = P>,
+    ) -> Result<PhysAddr, VmError> {
+        let slot = self
+            .pages
+            .iter_mut()
+            .find(|p| p.is_none())
+            .ok_or(PageAllocError::OutOfMemory)?;
+        let page = memory.alloc_zeroed_page()?;
+        let pa = page.phys_addr();
+        *slot = Some(page);
+        Ok(pa)
+    }
+    /// 仅归还未发布或断开并同步过的独占表页；归还失败时保留原句柄。
+    pub(super) fn release(&mut self, memory: &mut impl VmMemory<Page = P>, pa: PhysAddr) {
+        let slot = self
+            .pages
+            .iter_mut()
+            .find(|p| p.as_ref().is_some_and(|p| p.phys_addr() == pa))
+            .expect("owned table missing");
+        let page = slot.take().expect("owned table missing");
+        // SAFETY: 调用点已保证表页不再被地址翻译或别名访问。
+        if let Err((error, page)) = unsafe { memory.release_page(page) } {
+            *slot = Some(page);
+            panic!("VM table ownership failure: {error:?}");
+        }
+    }
+    /// 只用于构造回滚或已确认不活动的地址空间。
+    pub(super) fn release_all(&mut self, memory: &mut impl VmMemory<Page = P>) {
+        for index in 0..N {
+            if let Some(page) = &self.pages[index] {
+                self.release(memory, page.phys_addr());
+            }
+        }
+    }
+}
+
+/// 公共层可复用叶项编解码，但查询内核地址空间时绝不接受用户权限。
+pub(super) fn kernel_translation(
+    entry: Option<Translation>,
+) -> Result<Option<Translation>, VmError> {
+    if entry.is_some_and(|t| t.perm.user) {
+        Err(VmError::InvalidTable)
+    } else {
+        Ok(entry)
+    }
+}
 /// 未启用和已停用共用 Inactive；重复停用都返回 InvalidState。
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum State {
+pub(super) enum State {
     Inactive,
     Active,
     Destroyed,
@@ -43,6 +147,7 @@ pub struct KernelAddressSpace<'a, M: VmMemory, A: VmArch> {
     // 防止泛型页句柄的析构使仍被硬件使用的存储失效。
     pub(crate) tables: ManuallyDrop<Tables<M::Page>>,
     pub(crate) root: PhysAddr,
+    base: Range<VirtAddr>,
     window: Range<VirtAddr>,
     state: State,
 }
@@ -59,18 +164,26 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
     /// InvalidLayout 必须先于任何申请；表页或句柄容量不足保留 OutOfMemory。
     pub fn new(memory: &'a mut M, arch: &'a mut A, layout: KernelLayout) -> Result<Self, VmError> {
         validate_layout(memory, arch, &layout)?;
+        Self::from_validated(memory, arch, layout)
+    }
+
+    /// 共享基础映射的构造路径；调用点已对同一份 layout 完成全部布局校验。
+    pub(super) fn from_validated(
+        memory: &'a mut M,
+        arch: &'a mut A,
+        layout: KernelLayout,
+    ) -> Result<Self, VmError> {
         let mut space = Self {
             memory,
             arch,
-            tables: ManuallyDrop::new(Tables {
-                pages: core::array::from_fn(|_| None),
-            }),
+            tables: ManuallyDrop::new(Tables::empty()),
             root: PhysAddr(0),
+            base: VirtAddr(layout.code.start.0)..VirtAddr(layout.allocatable.end.0),
             window: layout.test_window,
             state: State::Inactive,
         };
         let result = (|| {
-            space.root = space.alloc_table()?;
+            space.root = space.tables.alloc(space.memory)?;
             for (range, perm) in [
                 (layout.code, MapPerm::RX),
                 (layout.rodata, MapPerm::R),
@@ -84,7 +197,7 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
             Ok(())
         })();
         if let Err(error) = result {
-            space.release_all();
+            space.tables.release_all(space.memory);
             return Err(error);
         }
         Ok(space)
@@ -125,7 +238,7 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
         if !self.arch.valid_virt(va) {
             return Err(VmError::InvalidAddress);
         }
-        self.arch.query(&*self.tables, self.root, va)
+        kernel_translation(self.arch.query(&*self.tables, self.root, va)?)
     }
 
     /// 撤销窗口映射；同步后归还断开的空表，不释放数据页。
@@ -146,7 +259,7 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
         let removed = unsafe { self.arch.unmap_page(&mut *self.tables, self.root, va)? };
         self.sync_if_active();
         for pa in removed.retired.into_iter().flatten() {
-            self.release_table(pa);
+            self.tables.release(self.memory, pa);
         }
         Ok(removed.mapping)
     }
@@ -203,42 +316,24 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
         if self.state == State::Active || self.arch.current_root()? == Some(self.root) {
             return Err(VmError::ActiveAddressSpace);
         }
-        self.release_all();
+        self.tables.release_all(self.memory);
         self.state = State::Destroyed;
         Ok(())
     }
 
     /// 公共层先申请全部页，再交架构发布；失败时仅撤回本次资源。
     fn insert(&mut self, va: VirtAddr, pa: PhysAddr, perm: MapPerm) -> Result<(), VmError> {
-        let count = self.arch.needed_tables(&*self.tables, self.root, va)?;
-        if count > 2 {
-            return Err(VmError::InvalidTable);
+        // SAFETY: 构造只建立未启用的基础映射；窗口调用方保证页面有效、活动时关中断。
+        unsafe {
+            self.tables.insert_page(
+                self.memory,
+                self.arch,
+                self.root,
+                va,
+                PageMapping { phys: pa, perm },
+                self.state == State::Active,
+            )
         }
-        let mut spare = [PhysAddr(0); 2];
-        let mut acquired = 0;
-        let result = (|| {
-            for slot in spare.iter_mut().take(count) {
-                *slot = self.alloc_table()?;
-                acquired += 1;
-            }
-            // SAFETY: 全部新页已清零并登记，地址不重复，操作期间独占表页。
-            unsafe {
-                self.arch.map_page(
-                    &mut *self.tables,
-                    self.root,
-                    va,
-                    PageMapping { phys: pa, perm },
-                    &spare[..count],
-                )
-            }
-        })();
-        self.sync_if_active();
-        if result.is_err() {
-            for pa in spare[..acquired].iter().copied() {
-                self.release_table(pa);
-            }
-        }
-        result
     }
     /// 所有公共操作先拒绝已销毁对象，不再访问表页或 CPU。
     fn live(&self) -> Result<(), VmError> {
@@ -265,46 +360,55 @@ impl<'a, M: VmMemory, A: VmArch> KernelAddressSpace<'a, M, A> {
             }
         }
     }
-    /// 先找空的句柄槽位，再从同一资源服务取得已清零表页。
-    fn alloc_table(&mut self) -> Result<PhysAddr, VmError> {
-        let slot = self
-            .tables
-            .pages
-            .iter_mut()
-            .find(|p| p.is_none())
-            .ok_or(PageAllocError::OutOfMemory)?;
-        let page = self.memory.alloc_zeroed_page()?;
-        let pa = page.phys_addr();
-        *slot = Some(page);
-        Ok(pa)
-    }
-    /// 调用点已保证表页不再可用；归还失败保留句柄并终止，不丢弃所有权故障。
-    fn release_table(&mut self, pa: PhysAddr) {
-        let slot = self
-            .tables
-            .pages
-            .iter_mut()
-            .find(|p| p.as_ref().is_some_and(|p| p.phys_addr() == pa))
-            .expect("owned table missing");
-        let page = slot.take().expect("owned table missing");
-        // SAFETY: 未发布、已断开并同步，或整个地址空间已确认停用。
-        if let Err((error, page)) = unsafe { self.memory.release_page(page) } {
-            *slot = Some(page);
-            panic!("VM table ownership failure: {error:?}");
-        }
-    }
-    /// 仅用于构造回滚或已确认不活动的空间，归还全部登记表页。
-    fn release_all(&mut self) {
-        for index in 0..TABLE_CAPACITY {
-            if let Some(page) = &self.tables.pages[index] {
-                self.release_table(page.phys_addr());
+    /// 转交已启用的基础页表。失败交回原对象，调用者仍可撤销窗口或修正区间。
+    #[allow(clippy::result_large_err)] // 无堆；错误需完整交回原表页与服务借用。
+    pub fn into_kernel_base(
+        self,
+        allowed: Range<VirtAddr>,
+    ) -> Result<KernelBase<M::Page>, (VmError, Self)> {
+        let check = (|| {
+            self.live()?;
+            if self.state != State::Active || self.arch.current_root() != Ok(Some(self.root)) {
+                return Err(VmError::InvalidState);
             }
+            for addr in (self.window.start.0..self.window.end.0).step_by(PAGE_SIZE) {
+                if self.query(VirtAddr(addr)) != Ok(None) {
+                    return Err(VmError::InvalidState);
+                }
+            }
+            if !self
+                .arch
+                .valid_user_range(allowed.clone(), &[self.base.clone(), self.window.clone()])
+            {
+                return Err(VmError::InvalidLayout);
+            }
+            Ok(())
+        })();
+        if let Err(error) = check {
+            return Err((error, self));
         }
+        let base = self.base.clone();
+        let (root, tables) = self.take_tables();
+        Ok(KernelBase::from_tables(
+            root,
+            tables,
+            base,
+            allowed,
+            State::Active,
+        ))
+    }
+
+    /// 转移已验证的全部页句柄，原容器留下空表。
+    pub(super) fn take_tables(mut self) -> (PhysAddr, ManuallyDrop<Tables<M::Page>>) {
+        (
+            self.root,
+            core::mem::replace(&mut self.tables, ManuallyDrop::new(Tables::empty())),
+        )
     }
 }
 
 /// 先检查每段和连续性，再检查资源范围；不触碰任何页面。
-fn validate_layout<M: VmMemory, A: VmArch>(
+pub(super) fn validate_layout<M: VmMemory, A: VmArch>(
     memory: &M,
     arch: &A,
     layout: &KernelLayout,
@@ -343,14 +447,20 @@ fn valid_range(start: usize, end: usize, valid: impl Fn(usize) -> bool) -> Resul
         || !end.is_multiple_of(PAGE_SIZE)
         || !valid(start)
         || !valid(end - 1)
+        || crosses_invalid_boundary(start, end, valid)
     {
         return Err(VmError::InvalidLayout);
     }
-    for bit in 0..usize::BITS {
-        let boundary = 1usize << bit;
-        if boundary > start && boundary < end && !valid(boundary) {
-            return Err(VmError::InvalidLayout);
-        }
-    }
     Ok(())
+}
+
+/// 即使两端可表示，两个规范地址区之间也可能存在不能访问的二进制边界。
+pub(super) fn crosses_invalid_boundary(
+    start: usize,
+    end: usize,
+    valid: impl Fn(usize) -> bool,
+) -> bool {
+    (0..usize::BITS)
+        .map(|bit| 1usize << bit)
+        .any(|boundary| start < boundary && boundary < end && !valid(boundary))
 }

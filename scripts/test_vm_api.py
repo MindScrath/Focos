@@ -73,6 +73,41 @@ class VmApiTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(error, result.stderr)
 
+    def test_live_user_prevents_kernel_destroy_or_deactivate(self):
+        for operation in ("kernel.destroy(memory, arch)", "unsafe { kernel.deactivate(arch) }"):
+            with self.subTest(operation=operation):
+                result = self.compile("""
+                    use focos_kernel::mm::{KernelBase, UserAddressSpace};
+                    pub fn call<M: VmMemory, A: VmArch>(
+                        kernel: &mut KernelBase<M::Page>, memory: &mut M, arch: &mut A
+                    ) {
+                        let space = UserAddressSpace::new(kernel, memory, arch, kernel.allowed_user_range()).unwrap();
+                        let _ = OPERATION;
+                        drop(space);
+                    }
+                """.replace("OPERATION", operation))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("E0502", result.stderr)
+
+    def test_user_entries_require_explicit_unsafe(self):
+        for operation in ("a.activate(arch)", "a.deactivate(arch)", "a.switch_to(b,arch)",
+                          "a.map_page(memory,arch,va,pa,MapPerm::USER_R)", "a.unmap_page(memory,arch,va)",
+                          "a.copy_from_user(arch,access,va,&mut [])", "a.copy_to_user(arch,access,va,&[])",
+                          "access.copy_from_user(va,&mut [])", "access.copy_to_user(va,&[])",
+                          "access.probe_user_isolation(op,expected)", "arch.switch_root(pa,pa)"):
+            with self.subTest(operation=operation):
+                result = self.compile("""
+                    use focos_kernel::mm::UserAddressSpace;
+                    use focos_kernel::hal::{UserAccess,ProbeOp,ExpectedFault};
+                    pub fn call<'k,M: VmMemory,A: VmArch,U: UserAccess>(
+                        a:&mut UserAddressSpace<'k,M::Page>,b:&mut UserAddressSpace<'k,M::Page>,
+                        memory:&mut M,arch:&mut A,access:&mut U,va:VirtAddr,pa:PhysAddr,
+                        op:ProbeOp,expected:ExpectedFault
+                    ) { let _ = OPERATION; }
+                """.replace("OPERATION", operation))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("E0133", result.stderr)
+
     def test_independent_page_access_and_explicit_drop_compile(self):
         result = self.compile("""
             pub unsafe fn call<M: VmMemory, A: VmArch>(

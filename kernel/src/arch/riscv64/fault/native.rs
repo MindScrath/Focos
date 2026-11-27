@@ -1,6 +1,6 @@
 //! 固定记录不借用测试对象；异常入口与探针按单核、关中断协议交接。
 use super::*;
-use crate::hal::{self, FaultProbe};
+use crate::hal::{self, FaultProbe, UserAccess};
 use core::{
     arch::{asm, global_asm},
     cell::UnsafeCell,
@@ -29,6 +29,21 @@ unsafe extern "C" {
     static focos_probe_write_pc: u8;
     static focos_probe_write_resume: u8;
     static focos_probe_execute_resume: u8;
+    fn focos_copy_from_user(user: usize, kernel: *mut u8, len: usize) -> usize;
+    fn focos_copy_to_user(user: usize, kernel: *const u8, len: usize) -> usize;
+    static focos_copy_from_user_load_pc: u8;
+    static focos_copy_from_user_fault_resume: u8;
+    static focos_copy_to_user_store_pc: u8;
+    static focos_copy_to_user_fault_resume: u8;
+}
+
+fn supervisor_status() -> usize {
+    let status: usize;
+    // SAFETY: 只读本核状态；不得用 nomem 让用户访存越过观测点。
+    unsafe {
+        asm!("csrr {}, sstatus", out(reg) status, options(nostack));
+    }
+    status
 }
 
 /// 可复制到专用测试页的返回代码；指令编码只由架构层解释。
@@ -97,9 +112,30 @@ unsafe impl FaultProbe for NativeFaultProbe {
         op: ProbeOp,
         expected: ExpectedFault,
     ) -> Result<FaultInfo, ProbeError> {
+        // SAFETY: 继承 FaultProbe::probe 的单核、目标和返回路径前提。
+        unsafe { self.run_probe(op, expected, Channel::Kernel) }
+    }
+    unsafe fn sync_instructions(&mut self) {
+        compiler_fence(Ordering::SeqCst);
+        // SAFETY: 调用者已完成指令写入；不标 nomem，约束编译器与本核取指。
+        unsafe {
+            asm!("fence.i", options(nostack));
+        }
+        compiler_fence(Ordering::SeqCst);
+    }
+}
+
+impl NativeFaultProbe {
+    unsafe fn run_probe(
+        &mut self,
+        op: ProbeOp,
+        expected: ExpectedFault,
+        channel: Channel,
+    ) -> Result<FaultInfo, ProbeError> {
         // SAFETY: 单核且关中断；复制固定存储，不跨操作持有记录引用。
         let mut record = unsafe { RECORD.0.get().read_volatile() };
         record.arm(op, expected, self.site(&op))?;
+        record.channel = channel;
         // SAFETY: 已通过 Busy/参数检查；独占记录写回后，汇编才可能触发异常。
         unsafe {
             RECORD.0.get().write_volatile(record);
@@ -125,13 +161,107 @@ unsafe impl FaultProbe for NativeFaultProbe {
         }
         result
     }
-    unsafe fn sync_instructions(&mut self) {
+}
+
+enum KernelBuffer<'a> {
+    Destination(&'a mut [u8]),
+    Source(&'a [u8]),
+}
+
+impl NativeFaultProbe {
+    /// 调用者已验证完整用户区间及内核缓冲的别名；两者只在汇编的一次调用中交接。
+    unsafe fn copy(
+        &mut self,
+        address: VirtAddr,
+        mut buffer: KernelBuffer<'_>,
+    ) -> Result<(), UserCopyError> {
+        let (kind, pc, resume, len) = match &buffer {
+            KernelBuffer::Destination(dst) => (
+                FaultKind::LoadPage,
+                &raw const focos_copy_from_user_load_pc,
+                &raw const focos_copy_from_user_fault_resume,
+                dst.len(),
+            ),
+            KernelBuffer::Source(src) => (
+                FaultKind::StorePage,
+                &raw const focos_copy_to_user_store_pc,
+                &raw const focos_copy_to_user_fault_resume,
+                src.len(),
+            ),
+        };
+        let site = ProbeSite {
+            instruction: VirtAddr::from_raw(pc.addr()),
+            resume: VirtAddr::from_raw(resume.addr()),
+        };
+        // SAFETY: 单核运行。复制记录，不跨潜在异常保留原记录的引用。
+        let mut record = unsafe { RECORD.0.get().read_volatile() };
+        record.arm_copy(
+            ExpectedFault {
+                kind,
+                address,
+                site,
+            },
+            len,
+            user_access_ready(supervisor_status(), installed()),
+        )?;
+        let start = address.as_usize();
+        // SAFETY: 单核关中断，记录空闲且已完整设置；缓冲区按方向借用，无用户别名。
+        // 汇编只在一条用户访存指令期间置 SUM，外部调用保留内存副作用。
+        let copied = unsafe {
+            RECORD.0.get().write_volatile(record);
+            compiler_fence(Ordering::SeqCst);
+            match &mut buffer {
+                KernelBuffer::Destination(dst) => {
+                    focos_copy_from_user(start, dst.as_mut_ptr(), len)
+                }
+                KernelBuffer::Source(src) => focos_copy_to_user(start, src.as_ptr(), len),
+            }
+        };
         compiler_fence(Ordering::SeqCst);
-        // SAFETY: 调用者已完成指令写入；不标 nomem，约束编译器与本核取指。
-        unsafe {
-            asm!("fence.i", options(nostack));
+        assert_eq!(
+            supervisor_status() & USER_ACCESS_BITS,
+            0,
+            "user permissions after copy"
+        );
+        // SAFETY: 汇编已返回，异常处理已完成；独占消费结果并使接下来的调用可登记。
+        let observed = unsafe {
+            let mut record = RECORD.0.get().read_volatile();
+            let fault = record.finish().ok();
+            RECORD.0.get().write_volatile(record);
+            fault
+        };
+        let dst = match buffer {
+            KernelBuffer::Destination(dst) => Some(dst),
+            KernelBuffer::Source(_) => None,
+        };
+        complete_copy(start, len, copied, observed, dst)
+    }
+}
+
+// SAFETY: 使用与内核探针相同的唯一同步入口，明确区分日志、故障指令和恢复标签。
+unsafe impl UserAccess for NativeFaultProbe {
+    unsafe fn probe_user_isolation(
+        &mut self,
+        op: ProbeOp,
+        expected: ExpectedFault,
+    ) -> Result<FaultInfo, ProbeError> {
+        if !user_access_ready(supervisor_status(), installed()) {
+            return Err(ProbeError::InvalidProbe);
         }
-        compiler_fence(Ordering::SeqCst);
+        // SAFETY: 目标由调用者授权，已检查 CPU 状态，使用独立的精确匹配通道。
+        unsafe { self.run_probe(op, expected, Channel::Isolation) }
+    }
+    unsafe fn copy_from_user(
+        &mut self,
+        address: VirtAddr,
+        dst: &mut [u8],
+    ) -> Result<(), UserCopyError> {
+        // SAFETY: 活动用户区和内核缓冲由调用方验证；失败后清零未读后缀。
+        unsafe { self.copy(address, KernelBuffer::Destination(dst)) }
+    }
+    unsafe fn copy_to_user(&mut self, address: VirtAddr, src: &[u8]) -> Result<(), UserCopyError> {
+        // SAFETY: 源只读、与用户目标不别名，硬件权限按字节检查。
+        unsafe { self.copy(address, KernelBuffer::Source(src)) }
     }
 }
 
@@ -147,9 +277,23 @@ extern "C" fn focos_vm_trap(cause: usize, pc: usize, address: usize) -> usize {
                 RECORD.0.get().write_volatile(record);
             }
             // 原始 CSR 三元组在匹配后记录，不用 panic 表示预期异常。
-            hal::console_write_fmt(format_args!(
-                "FOCOS_VM_FAULT scause={cause:#x} sepc={pc:#x} stval={address:#x}\n"
-            ));
+            assert_eq!(supervisor_status() & (1 << 18), 0, "SUM in trap handler");
+            match record.channel {
+                Channel::Kernel | Channel::Isolation => {
+                    let tag = if matches!(record.channel, Channel::Kernel) {
+                        "FOCOS_VM_FAULT"
+                    } else {
+                        "FOCOS_USER_ISOLATION_FAULT"
+                    };
+                    hal::console_write_fmt(format_args!(
+                        "{tag} scause={cause:#x} sepc={pc:#x} stval={address:#x}\n"
+                    ));
+                }
+                Channel::Copy { start, .. } => hal::console_write_fmt(format_args!(
+                    "FOCOS_USER_COPY_FAULT scause={cause:#x} sepc={pc:#x} stval={address:#x} copied={}\n",
+                    address - start
+                )),
+            }
             resume
         }
         Err(()) => {
